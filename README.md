@@ -92,17 +92,39 @@ git --version
 
 Environment variables are managed with `dotenv` and loaded automatically in `playwright.config.ts` from a `.env` file at the project root. `.env` is git-ignored, so each environment (local machine, CI, etc.) keeps its own copy.
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root with the following keys:
 
 ```
+TTA_ENV=qa
 BASE_URL=
+QA_BASE_URL=
+STG_BASE_URL=
+PROD_BASE_URL=
+DEV_BASE_URL=
+API_BASE_URL=
+LOG_LEVEL=info
+TEST_ENV=QA
+TEST_AUTHOR=
+USERNAME=
+PASSWORD=
 ```
 
 | Variable | Description |
 |---|---|
-| `BASE_URL` | Base URL of the application under test, used as the starting point for `page.goto()` calls |
+| `TTA_ENV` | Active environment key used to select which `*_BASE_URL` to run against (e.g. `qa`, `stg`, `prod`, `dev`) |
+| `BASE_URL` | Default base URL of the application under test, used as the starting point for `page.goto()` calls |
+| `QA_BASE_URL` | Base URL for the QA environment |
+| `STG_BASE_URL` | Base URL for the Staging environment |
+| `PROD_BASE_URL` | Base URL for the Production environment |
+| `DEV_BASE_URL` | Base URL for local/dev environment (e.g. `http://localhost:3000`) |
+| `API_BASE_URL` | Base URL for API test requests |
+| `LOG_LEVEL` | Winston log verbosity (e.g. `info`, `debug`, `warn`, `error`) |
+| `TEST_ENV` | Environment label used in test reports/logs |
+| `TEST_AUTHOR` | Author tag used in test reports/logs |
+| `USERNAME` | Login username for the application under test |
+| `PASSWORD` | Login password for the application under test |
 
-Add new variables here as the framework grows (e.g. API base URLs, credentials, environment name), and reference them via `process.env.<VAR_NAME>` in `src/config`.
+`.env` is git-ignored and never committed — treat `USERNAME`/`PASSWORD` and any future secrets as environment-specific and set them locally (or as CI secrets), not in source control. Reference these values via `process.env.<VAR_NAME>` in `src/config`, and add new variables here as the framework grows.
 
 ## Path Aliases
 
