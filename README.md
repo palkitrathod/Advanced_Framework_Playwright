@@ -33,16 +33,6 @@ A TypeScript-based test automation framework built on [Playwright](https://playw
 
 Empty folders are tracked with `.gitkeep` placeholders so the intended structure is preserved in version control until they're populated.
 
-## What's done so far
-
-- [x] Initial project scaffolding (folder structure for pages, fixtures, api, config, utils, test data)
-- [x] Playwright configuration (`playwright.config.ts`) with Chromium, Firefox, and WebKit projects, HTML reporter, and trace-on-retry
-- [x] TypeScript configuration with path aliases
-- [x] `.env` support via `dotenv`, loaded in `playwright.config.ts`
-- [x] GitHub Actions CI workflow (`.github/workflows/playwright.yml`) — runs on push/PR to `main`/`master`, installs browsers, runs the suite, and uploads the HTML report as an artifact
-- [x] Core dependencies installed: Allure reporting, Winston logging, Ajv schema validation, Faker test data generation, CSV/XLSX/JSONPath data-driven testing support
-- [x] Sample spec (`src/tests/example.spec.ts`) verifying the setup works end-to-end
-
 ## Prerequisites
 
 Make sure you have the following installed before setting up the project:
