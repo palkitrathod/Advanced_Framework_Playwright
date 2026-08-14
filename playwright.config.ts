@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+// Resolve .env from the project root, not process.cwd(), so tests can be
+// invoked from any directory.
+dotenv.config({ path: path.resolve(__dirname, '.env'), quiet: true });
 
 function resolveBaseURL(): string 
 {

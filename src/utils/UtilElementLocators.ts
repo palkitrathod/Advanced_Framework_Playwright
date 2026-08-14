@@ -32,8 +32,10 @@ export class UtilElementLocator {
         this.log = createLogger(scope);
     }
 
-
-    private toLocator(target: Flex): Locator {
+    // .toLocator will make sure that if user used CSS Locator then it will return first part or else second part. If none of them
+    // then it will return default mean direct locator since playwright support direct locator
+    private toLocator(target: Flex): Locator
+    {
         return typeof target === 'string' ? this.page.locator(target) : target;
     }
 
@@ -46,7 +48,7 @@ export class UtilElementLocator {
 
     async click(target: Flex, timeout: number = DEFAULT_ACTION_TIMEOUT_MS): Promise<void> {
         const loc = this.toLocator(target); // Checking if it is a normal locator or a Playwright locator.
-        this.log.debug(`click ${this.describe(target)}`);
+        this.log.debug(`Click ${this.describe(target)}`);
         await loc.click({ timeout });
     }
 
@@ -58,7 +60,7 @@ export class UtilElementLocator {
     }
     async rightClick(target: Flex, timeout: number = DEFAULT_ACTION_TIMEOUT_MS): Promise<void> {
         const loc = this.toLocator(target);
-        this.log.debug(`rightClick ${this.describe(target)}`);
+        this.log.debug(`Right_Click ${this.describe(target)}`);
         await loc.click({ button: 'right', timeout });
     }
     async hover(target: Flex, timeout: number = DEFAULT_ACTION_TIMEOUT_MS): Promise<void> {
@@ -70,7 +72,7 @@ export class UtilElementLocator {
 
     async fill(target: Flex, value: string, timeout: number = DEFAULT_ACTION_TIMEOUT_MS): Promise<void> {
         const loc = this.toLocator(target);
-        this.log.debug(`fill ${this.describe(target)}`);
+        this.log.debug(`Fill ${this.describe(target)}`);
         await loc.fill(value, { timeout });
     }
     async type(target: Flex, value: string, timeout: number = DEFAULT_ACTION_TIMEOUT_MS): Promise<void> {

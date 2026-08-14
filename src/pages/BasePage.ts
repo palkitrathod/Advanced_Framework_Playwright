@@ -13,13 +13,20 @@
 //Every single page will going to inherit from this base page. This is the base page for all the pages in the application.
 
 import {Page} from "@playwright/test";
+import { UtilElementLocator } from "@utils/UtilElementLocators";
+import { createLogger, type Logger } from "@utils/logger";
 
 export abstract class BasePage 
 {
     protected readonly page: Page;
+    protected readonly el: UtilElementLocator;
+    protected readonly log: Logger;
+
     protected constructor (page : Page, scope : string)
     {
         this.page = page;
+        this.el = new UtilElementLocator(page, scope);
+        this.log = createLogger(scope);
     }
     protected async goto (relativePath : string) : Promise<void>
     {
