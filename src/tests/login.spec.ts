@@ -18,9 +18,11 @@ test.describe('TTACart - Login', () =>
         });
     });
 
-    test('logs in with valid credentials @p0', async ({ page }) => {
+    test('logs in with valid credentials @p0', async ({ page }) => 
+    {
 
-        await test.step('Login as standard_user', async () => {
+        await test.step('Login as standard_user', async () => 
+        {
             log.info('Logging in as standard_user');
             await loginPage.loginAs('standard_user', 'tta_secret');
 

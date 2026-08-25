@@ -21,7 +21,8 @@ export class LoginPage extends BasePage {
     private readonly errorBox: Locator;
     private readonly loginCredentialsHint: Locator;
 
-    constructor(page: Page) {
+    constructor(page: Page) 
+    {
         super(page, 'LoginPage');
         this.usernameInput = page.locator('[data-test="username"]');
         this.passwordInput = page.locator('[data-test="password"]');
