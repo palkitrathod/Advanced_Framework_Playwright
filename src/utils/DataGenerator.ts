@@ -13,6 +13,7 @@
  *   - `faker.location.zipCode()`         (v8 renamed `address` -> `location`)
  */
 
+// Layer 1 : 3 Interfaces are just forms
 import { faker } from '@faker-js/faker';
 
 export interface Credentials {
@@ -31,6 +32,9 @@ export interface UserProfile extends Credentials, CheckoutCustomer {
     fullName: string;
     phone: string;
 }
+
+
+//Layer 2 - Vending Machine with two rows
 
 export class DataGenerator {
     // ---------- credentials ----------
