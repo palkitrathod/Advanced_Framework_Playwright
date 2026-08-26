@@ -1,4 +1,4 @@
-import { Locator, Page } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 /**
@@ -21,8 +21,7 @@ export class LoginPage extends BasePage {
     private readonly errorBox: Locator;
     private readonly loginCredentialsHint: Locator;
 
-    constructor(page: Page) 
-    {
+    constructor(page: Page) {
         super(page, 'LoginPage');
         this.usernameInput = page.locator('[data-test="username"]');
         this.passwordInput = page.locator('[data-test="password"]');
@@ -41,8 +40,13 @@ export class LoginPage extends BasePage {
         await this.el.fill(this.usernameInput, username);
         await this.el.fill(this.passwordInput, password);
         await this.el.click(this.loginButton);
+        await expect.poll(async () => (
+            this.page.url().includes('/inventory') || await this.errorBox.isVisible()
+        )).toBe(true);
     }
 
-
+    async waitForLoginButtonHidden(): Promise<void> {
+        await this.el.waitForHidden(this.loginButton);
+    }
 
 }
