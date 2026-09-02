@@ -4,7 +4,7 @@
  * The TTACart suite is intentionally thin. We only inherit:
  *  - `page`     -> Playwright Page handle
  *  - `el`       -> UtilElementLocator wrapper for actions
- *  - `log`      -> a per-page Logger (scope = the subclass name)
+ *  - `log`      ->  a per-page Logger (scope = the subclass name)
  *  - `goto(p)`  -> small navigation helper that respects baseURL
  *
  * Subclasses still declare their own `private readonly` Locator fields; the
