@@ -9,6 +9,7 @@ node_modules/
 
 # Generated reports & logs
 /tta-report/
+/reports/
 logs/
 
 # Environment
