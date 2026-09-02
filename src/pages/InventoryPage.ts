@@ -1,7 +1,8 @@
 import { expect, Locator, Page } from '@playwright/test';
 import { BasePage } from './BasePage';
 
-export class InventoryPage extends BasePage {
+export class InventoryPage extends BasePage 
+{
     static readonly PATH = '/playwright/ttacart/inventory.html';
 
     private readonly title: Locator;
@@ -12,15 +13,16 @@ export class InventoryPage extends BasePage {
     private readonly cartLink: Locator;
     private readonly cartBadge: Locator;
 
-    constructor(page: Page) {
+    constructor(page: Page) 
+    {
         super(page, 'InventoryPage');
-        this.title = page.locator('[data-test="title"]');
-        this.sortDropdown = page.locator('[data-test="product-sort-container"]');
-        this.items = page.locator('[data-test="inventory-item"]');
-        this.itemNames = page.locator('[data-test="inventory-item-name"]');
-        this.itemPrices = page.locator('[data-test="inventory-item-price"]');
-        this.cartLink = page.locator('[data-test="shopping-cart-link"]');
-        this.cartBadge = page.locator('[data-test="shopping-cart-badge"]');
+        this.title = page.locator('[data-test="title"]'); //Page Title
+        this.sortDropdown = page.locator('[data-test="product-sort-container"]'); //Dropdown for sorting
+        this.items = page.locator('[data-test="inventory-item"]'); //List of inventory items
+        this.itemNames = page.locator('[data-test="inventory-item-name"]'); //Item names
+        this.itemPrices = page.locator('[data-test="inventory-item-price"]'); //Item prices
+        this.cartLink = page.locator('[data-test="shopping-cart-link"]'); //Cart link
+        this.cartBadge = page.locator('[data-test="shopping-cart-badge"]'); //added item numer called as Cart Badge
     }
 
     async open(): Promise<void> {

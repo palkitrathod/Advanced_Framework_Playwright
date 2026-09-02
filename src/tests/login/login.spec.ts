@@ -1,18 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import { LoginPage } from '@pages/LoginPage';
 import { createLogger } from '@utils/logger';
 
 const log = createLogger('login.spec');
 
-test.describe('TTACart - Login', () => 
-{
+test.describe('TTACart - Login', () => {
     let loginPage: LoginPage;
 
-    test.beforeEach(async ({ page }) => 
-    {
+    test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
-        await test.step('Open the TTACart login page', async () => 
-        {
+        await test.step('Open the TTACart login page', async () => {
             log.info('Opening the TTACart login page');
             await loginPage.open();
         });
@@ -27,8 +24,15 @@ test.describe('TTACart - Login', () =>
         });
 
         await test.step('Verify login form is no longer shown', async () => {
-         log.info('Asserting login form is hidden after login');
-            await expect(page.locator('[data-test="login-button"]')).toBeHidden();
+            log.info('Asserting login form is hidden after login');
+            await loginPage.waitForLoginButtonHidden();
         });
+
+
+
     });
+
+
+
+
 });
