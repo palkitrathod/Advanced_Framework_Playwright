@@ -343,7 +343,7 @@ npx playwright show-trace tta-report/traces/trace_1.zip
 
 Because the diff needs a previous run to compare against, the first run on a clean checkout prints `only one build recorded — run again to compare`; the flaky verdict appears from the second run onward.
 
-To wire up a real provider, replace the stub in `hasApiKey()` with real key detection (e.g. reading `process.env.OPENAI_API_KEY` or `process.env.ANTHROPIC_API_KEY`) and implement `analyzeFailure()` against that provider's API.
+To wire up a real provider, replace the stub in `hasApiKey()` with real key detection (e.g. reading `process.env.LLM_API_KEY`, or whatever variable name your chosen provider's SDK expects) and implement `analyzeFailure()` against that provider's API.
 
 ## Continuous Integration
 

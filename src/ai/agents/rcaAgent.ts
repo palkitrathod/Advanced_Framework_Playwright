@@ -1,7 +1,7 @@
 /**
  * RCA Agent stub.
  *
- * Real implementation requires an LLM provider key (e.g. OpenAI / Anthropic).
+ * Real implementation requires an LLM provider key from whichever backend you choose.
  * When the key is missing the reporter skips AI verdict generation gracefully.
  */
 
