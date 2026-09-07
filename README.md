@@ -328,7 +328,7 @@ ATTACH_SCREENSHOTS=true npm test
 | `src/tests/e2e/e2e-checkout.spec.ts` | `@P0 @Regression @Checkout` | Full journey: login → inventory → cart → checkout steps one/two → order complete |
 | `src/tests/e2e/e2e-checkout_new_fixture.spec.ts` | `@FixtureExample` | The same journey expressed through the state-fixture chain, plus an invalid-login case |
 | `src/tests/e2e/e2e-checkout-env.spec.ts` | `@P0 @Regression @Checkout` | Env-driven twin of `e2e-checkout.spec.ts`; requires `CHECKOUT_ITEM_ID`, `STANDARD_USER`, `TTA_SECRET` (see [Environment Configuration](#environment-configuration)) |
-| `src/tests/apisTests/**` | `@p0` `@P0` `@e2e` `@negative` `@regression` | 21 Restful Booker API tests across four abstraction levels — see [API Testing](#api-testing) |
+| `src/tests/apisTests/**` | `@p0` `@P0` `@e2e` `@negative` `@regression` | 22 API tests across four abstraction levels — Restful Booker throughout, plus one `newContext` demo against gorest.in — see [API Testing](#api-testing) |
 
 > **Run from the project root.** `npx playwright test` only looks for `playwright.config.ts` in the *current* directory. Invoked from a subfolder such as `src/tests`, it silently runs with Playwright's defaults — no `baseURL`, no projects, no reporters — and relative navigations like `page.goto('/path')` fail with `Protocol error (Page.navigate): Cannot navigate to invalid URL`. The `npm` scripts above avoid this entirely, because `npm run` always executes from the package root regardless of where you invoke it.
 
@@ -347,7 +347,7 @@ The four folders are a deliberate ladder: each level removes a pain the level be
 
 | Level | Folder | What it demonstrates | Pain it removes |
 |---|---|---|---|
-| 1 | `01_restfulbooker_raw/` | Raw `request.get/post/put`, with URLs, headers and payloads inline | — (the baseline) |
+| 1 | `01_restfulbooker_raw/` | Raw `request.get/post/put`, with URLs, headers and payloads inline, plus one `request.newContext()` demo | — (the baseline) |
 | 2 | `02_restfulbooker_apiHelper/` | The same calls through `ApiHelper` | Every spec re-writing header/verb boilerplate |
 | 3 | `03_restfulbooker_fixture_e2e_api/` | `BookingApi` service object, handed over by `booker.fixture.ts` | Specs knowing endpoint paths, and re-minting tokens |
 | 4 | `04_jsonpath_plus/` | Deep response reads with `jsonpath-plus` | Long chains of optional property access |
@@ -358,7 +358,7 @@ The four folders are a deliberate ladder: each level removes a pain the level be
 |---|---|---|
 | `01_restfulbooker_raw/01_basic_ping.spec.ts` | 1 | `GET /ping` health check, expects `201` (see the caveat below) |
 | `01_restfulbooker_raw/02_post_operation.spec.ts` | 1 | `POST /booking`, asserts `bookingid` and the echoed first/last name |
-| `01_restfulbooker_raw/03_newcontext_api.spec.ts` | 0 | Empty placeholder (0 bytes) |
+| `01_restfulbooker_raw/03_newcontext_api.spec.ts` | 1 | `request.newContext()` with its own `baseURL`, an `X-Trace-Id` header and a 15s timeout, then `dispose()`. The only spec that targets **gorest.in** rather than Restful Booker |
 | `01_restfulbooker_raw/04_put_operation.spec.ts` | 1 | Auth → create → update, as three `test.step`s in one test |
 | `01_restfulbooker_raw/05_crud.spec.ts` | 3 | The same flow split across `test.describe.serial` tests sharing state |
 | `02_restfulbooker_apiHelper/create-booking.spec.ts` | 1 | `POST /booking` through `ApiHelper`, asserting the echoed body |
@@ -366,7 +366,7 @@ The four folders are a deliberate ladder: each level removes a pain the level be
 | `03_restfulbooker_fixture_e2e_api/booking-crud.e2e.spec.ts` | 3 | Serial lifecycle: create → update (token from the fixture) → delete, then confirm it is gone |
 | `03_restfulbooker_fixture_e2e_api/booking-negative.spec.ts` | 6 | Unknown and non-numeric ids → 404, partial and empty payloads → 500, bad credentials, and a `PUT` with an invalid token that must change nothing |
 | `04_jsonpath_plus/jsonpath-queries.e2e.spec.ts` | 4 | Field reads, wildcard and recursive descent, array index/slice/filter over `GET /booking`, then cleanup |
-| **Total** | **21** | |
+| **Total** | **22** | |
 
 `04_jsonpath_plus/` also ships two non-spec files: `jsonpath-cheatsheet.md` (syntax reference) and
 `store.json` (the classic bookstore document, for practising queries offline).
@@ -411,7 +411,7 @@ randomness comes from `DataGenerator`, which grew four primitives to support thi
 ### Running them
 
 ```bash
-# All 21 API tests — needs BASE_URL pointed at the API host, see the caveat below
+# All API tests — needs BASE_URL pointed at the API host, see the caveat below
 BASE_URL=https://restful-booker.herokuapp.com npm test -- src/tests/apisTests
 
 # One level at a time
@@ -444,9 +444,10 @@ Expected: 201
 Received: 200
 ```
 
-So a plain `npm test -- src/tests/apisTests` gives **20 passed, 1 failed**. Override `BASE_URL` for the
-run (as above) and it is **21 passed**. Every other API spec is unaffected: levels 1–2 build absolute
-URLs themselves, and levels 3–4 go through `BookingApi`, which carries its own base URL.
+So on a plain `npm test -- src/tests/apisTests` this is the one spec that fails; override `BASE_URL` for
+the run (as above) and it passes. Every other API spec is unaffected, because none of them rely on the
+config's `baseURL`: levels 1–2 build absolute URLs inline, levels 3–4 go through `BookingApi` (which
+carries its own base URL), and `03_newcontext_api.spec.ts` sets a `baseURL` on its own request context.
 
 Two ways to fix it properly, in order of preference:
 
