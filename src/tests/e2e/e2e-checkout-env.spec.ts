@@ -14,11 +14,18 @@ import { visualStep } from '@utils/visualStep';
 
 const log = createLogger('e2e-checkout-env');
 
-// Resolved at load time so an incomplete .env fails the file, not a step midway.
-assertEnv('STANDARD_USER', 'TTA_SECRET');
-const ITEM_ID = requireEnv('CHECKOUT_ITEM_ID');
+// Deliberately NOT resolved at module scope. Playwright imports every spec file
+// to enumerate its tests, so a throw out here aborts collection for the whole
+// run - every other suite included, even ones that never touch these variables.
+// Validating in beforeAll keeps the blast radius to this file.
+let ITEM_ID: string;
 
 test.describe('@P0 @Regression E2E @Checkout Checkout Feature (env-driven)', () => {
+    test.beforeAll(() => {
+        assertEnv('STANDARD_USER', 'TTA_SECRET');
+        ITEM_ID = requireEnv('CHECKOUT_ITEM_ID');
+    });
+
     test.beforeEach(async ({ loginPage }) => {
         log.info(`Step 1: logging in as ${credentials.standardUser} (from .env)`);
         await loginPage.open();

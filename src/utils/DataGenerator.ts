@@ -6,15 +6,18 @@
  * centralises all random data so tests stay deterministic-friendly (one
  * import) and read naturally.
  *
- * Faker v8 API notes (project is CommonJS, so we pin the dual CJS/ESM v8):
- *   - `faker.internet.userName()`        (lowercase `username()` is v9+ only)
- *   - `faker.internet.password({length})` (v8 options-object form; avoids the
- *      deprecated positional overload)
- *   - `faker.location.zipCode()`         (v8 renamed `address` -> `location`)
+ * Faker API notes (installed: v10 — see `@faker-js/faker` in package.json):
+ *   - `faker.internet.username()`        lowercase. `userName()` was removed
+ *      after v8, and calling it throws "is not a function".
+ *   - `faker.internet.password({length})` options-object form; avoids the
+ *      deprecated positional overload
+ *   - `faker.location.zipCode()`         v8 renamed `address` -> `location`
+ *   - `faker.number.int({min, max})`     v8 renamed `datatype.number`
  */
 
 // Layer 1 : 3 Interfaces are just forms
 import { faker } from '@faker-js/faker';
+import { envOr } from '@config/env';
 
 export interface Credentials {
     username: string;
@@ -41,7 +44,7 @@ export class DataGenerator {
 
     /** Random username, e.g. "Otilia35". */
     static username(): string {
-        return faker.internet.userName();
+        return faker.internet.username();
     }
 
     /**
@@ -120,6 +123,21 @@ export class DataGenerator {
             firstName: DataGenerator.firstName(),
             lastName: DataGenerator.lastName(),
             postalCode: DataGenerator.postalCode(),
+        };
+    }
+
+    /**
+     * Checkout customer taken from `.env`, with a generated value for anything
+     * that is not set. Lets a run be pinned to known data without editing code.
+     *
+     * Reads CHECKOUT_FIRST_NAME, CHECKOUT_LAST_NAME and CHECKOUT_POSTAL_CODE
+     * (all listed in `.env.example`). Used by `e2e-checkout-env.spec.ts`.
+     */
+    static checkoutCustomerFromEnv(): CheckoutCustomer {
+        return {
+            firstName: envOr('CHECKOUT_FIRST_NAME', DataGenerator.firstName()),
+            lastName: envOr('CHECKOUT_LAST_NAME', DataGenerator.lastName()),
+            postalCode: envOr('CHECKOUT_POSTAL_CODE', DataGenerator.postalCode()),
         };
     }
 
