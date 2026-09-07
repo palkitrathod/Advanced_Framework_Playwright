@@ -82,6 +82,36 @@ export class DataGenerator {
         return faker.location.zipCode();
     }
 
+    // ---------- primitives ----------
+
+    /** Random whole number between min and max (both inclusive). */
+    static number(min: number, max: number): number {
+        return faker.number.int({ min, max });
+    }
+
+    /** Random true/false. */
+    static bool(): boolean {
+        return faker.datatype.boolean();
+    }
+
+    /** Pick one item at random from a list. Keeps the literal type. */
+    static oneOf<T>(items: readonly T[]): T {
+        return faker.helpers.arrayElement(items);
+    }
+
+    /**
+     * A calendar date shifted by `days`, as `YYYY-MM-DD`.
+     *
+     * restful-booker wants plain dates, not timestamps, so we cut the ISO
+     * string at the `T`. Pass `from` to offset off a specific date instead of
+     * today — that is how a check-out date is derived from its check-in.
+     */
+    static dateOffset(days: number, from: Date = new Date()): string {
+        const date = new Date(from);
+        date.setDate(date.getDate() + days);
+        return date.toISOString().split('T')[0];
+    }
+
     // ---------- composites ----------
 
     /** Customer info for the TTACart checkout step-one form. */
