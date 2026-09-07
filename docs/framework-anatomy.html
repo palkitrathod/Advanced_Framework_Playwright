@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A worked-example guide to the TTACart Playwright framework: the same test with and without POM, how each layer got there, and every keyword dissected.">
+<title>Anatomy of a Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+/* ── tokens: light is the base; every colour is declared here first ────── */
+:root {
+  --paper:      #F1F3F6;
+  --surface:    #FFFFFF;
+  --surface-2:  #E7EBF0;
+  --ink:        #10161D;
+  --ink-2:      #47535F;
+  --ink-3:      #77848F;
+  --rule:       #D3DAE2;
+  --rule-soft:  #E4E9EF;
+  --accent:     #2F4BD8;
+  --accent-soft:#E4E8FC;
+  --ochre:      #A2690F;
+  --ochre-soft: #F7EFDF;
+  --pass:       #16794F;
+  --pass-soft:  #E2F0E9;
+  --fail:       #B23A31;
+  --fail-soft:  #F8E7E5;
+  --code-bg:    #EDF0F4;
+  --shadow:     0 1px 2px rgba(16,22,29,.05), 0 8px 24px -12px rgba(16,22,29,.16);
+
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body:    "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:#0C1116; --surface:#131A22; --surface-2:#1A232D;
+    --ink:#E7EDF4; --ink-2:#A5B2C0; --ink-3:#71808F;
+    --rule:#26313D; --rule-soft:#1D2731;
+    --accent:#8098FF; --accent-soft:#1A2440;
+    --ochre:#E2AC50; --ochre-soft:#2A2013;
+    --pass:#46C68C; --pass-soft:#12291F;
+    --fail:#E87764; --fail-soft:#2B1714;
+    --code-bg:#0E151C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#0C1116; --surface:#131A22; --surface-2:#1A232D;
+  --ink:#E7EDF4; --ink-2:#A5B2C0; --ink-3:#71808F;
+  --rule:#26313D; --rule-soft:#1D2731;
+  --accent:#8098FF; --accent-soft:#1A2440;
+  --ochre:#E2AC50; --ochre-soft:#2A2013;
+  --pass:#46C68C; --pass-soft:#12291F;
+  --fail:#E87764; --fail-soft:#2B1714;
+  --code-bg:#0E151C;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--body); font-size: 17px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+.wrap { max-width: 70rem; margin-inline: auto; padding-inline: clamp(1.1rem, 4vw, 3rem); }
+.col  { max-width: 68ch; }
+
+/* ── masthead ──────────────────────────────────────────────────────────── */
+.masthead { border-bottom: 1px solid var(--rule); padding: clamp(2.6rem,7vw,5rem) 0 clamp(2rem,5vw,3.2rem); }
+.eyebrow {
+  font-family: var(--mono); font-size: .705rem; font-weight: 500;
+  letter-spacing: .17em; text-transform: uppercase; color: var(--ink-3);
+  display: flex; align-items: center; gap: .7rem; margin: 0 0 1.5rem;
+}
+.eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); max-width: 12rem; }
+h1 {
+  font-family: var(--display); font-weight: 700;
+  font-size: clamp(2.6rem, 7vw, 4.6rem); line-height: .98;
+  letter-spacing: -.032em; margin: 0 0 1.25rem; text-wrap: balance;
+}
+.standfirst {
+  font-size: clamp(1.09rem, 2.1vw, 1.3rem); line-height: 1.55;
+  color: var(--ink-2); max-width: 56ch; margin: 0;
+}
+.standfirst strong { color: var(--ink); font-weight: 600; }
+
+.transform {
+  margin-top: clamp(2.2rem,5vw,3.2rem);
+  display: grid; grid-template-columns: 1fr;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); box-shadow: var(--shadow); overflow: hidden;
+}
+@media (min-width: 60rem) { .transform { grid-template-columns: 1fr 1.25fr; } }
+.transform-side { padding: clamp(1.3rem,2.6vw,1.9rem); }
+.transform-side + .transform-side { border-top: 1px solid var(--rule); }
+@media (min-width: 60rem) { .transform-side + .transform-side { border-top: 0; border-left: 1px solid var(--rule); } }
+.panel-label {
+  font-family: var(--mono); font-size: .68rem; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 1rem;
+}
+.hero-call { font-family: var(--mono); font-size: clamp(.82rem,1.6vw,.95rem); line-height: 1.6; margin: 0; }
+.hero-note { font-size: .93rem; color: var(--ink-2); margin: 1.1rem 0 0; line-height: 1.5; }
+.beat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .62rem; }
+.beat { display: grid; grid-template-columns: 1.5rem 1fr auto; gap: .75rem; align-items: baseline; font-family: var(--mono); font-size: .795rem; line-height: 1.5; }
+.beat-n { color: var(--ink-3); font-size: .68rem; }
+.beat-do em { color: var(--accent); font-style: normal; }
+.beat-budget { color: var(--ochre); font-size: .69rem; white-space: nowrap; background: var(--ochre-soft); padding: .1rem .42rem; border-radius: 2px; }
+
+/* ── sections ──────────────────────────────────────────────────────────── */
+section { padding: clamp(2.8rem,6vw,4.6rem) 0; border-bottom: 1px solid var(--rule-soft); }
+.sec-head { display: flex; gap: 1.1rem; align-items: baseline; margin: 0 0 1.6rem; }
+.sec-n { font-family: var(--mono); font-size: .78rem; font-weight: 700; color: var(--accent); letter-spacing: .05em; padding-top: .42rem; }
+h2 { font-family: var(--display); font-weight: 700; font-size: clamp(1.55rem,3.4vw,2.25rem); line-height: 1.1; letter-spacing: -.022em; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 1.09rem; letter-spacing: -.008em; margin: 2.3rem 0 .7rem; text-wrap: balance; }
+h4 { font-family: var(--mono); font-weight: 700; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 2.2rem 0 .9rem; }
+p { margin: 0 0 1.05rem; }
+.lede { font-size: 1.08rem; color: var(--ink-2); }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+code { font-family: var(--mono); font-size: .855em; background: var(--code-bg); padding: .1em .34em; border-radius: 2px; color: var(--ink); }
+strong { font-weight: 600; }
+em.term { font-style: italic; color: var(--ink); }
+
+.code {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1rem 1.15rem; overflow-x: auto; margin: 1.3rem 0;
+  font-family: var(--mono); font-size: .795rem; line-height: 1.68; color: var(--ink);
+}
+.code code { background: none; padding: 0; font-size: inherit; }
+.code .c { color: var(--ink-3); font-style: italic; }
+.code .s { color: var(--ochre); }
+.code .k { color: var(--accent); }
+.code .hl { background: var(--accent-soft); border-radius: 2px; padding: .06em .2em; margin: 0 -.2em; }
+.filename { font-family: var(--mono); font-size: .69rem; font-weight: 500; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); margin: 1.5rem 0 -.55rem; display: block; }
+
+/* ── the dissect component ─────────────────────────────────────────────── */
+.dissect { margin: 1.4rem 0 0; display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+.d-row { display: grid; grid-template-columns: 1fr; gap: .55rem; padding: 1.15rem 0; border-bottom: 1px solid var(--rule-soft); }
+@media (min-width: 46rem) { .d-row { grid-template-columns: 13rem 1fr; gap: 1.4rem; } }
+.d-token { font-family: var(--mono); font-size: .8rem; font-weight: 700; color: var(--accent); background: none; padding: 0; line-height: 1.5; word-break: break-word; }
+.d-token .muted { color: var(--ink-3); font-weight: 400; }
+.d-body > * { margin: 0; }
+.d-body > * + * { margin-top: .5rem; }
+.d-what { font-size: .96rem; line-height: 1.55; }
+.d-link, .d-omit { font-size: .89rem; line-height: 1.5; display: grid; grid-template-columns: auto 1fr; gap: .55rem; align-items: baseline; }
+.d-tag { font-family: var(--mono); font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: .16rem .42rem; border-radius: 2px; white-space: nowrap; }
+.d-link .d-tag { background: var(--accent-soft); color: var(--accent); }
+.d-omit .d-tag { background: var(--fail-soft); color: var(--fail); }
+.d-link span:last-child, .d-omit span:last-child { color: var(--ink-2); }
+.d-omit span:last-child b { color: var(--ink); font-weight: 600; }
+.key { display: flex; flex-wrap: wrap; gap: 1.3rem; margin: 1.2rem 0 0; font-size: .89rem; color: var(--ink-2); }
+.key > span { display: flex; align-items: baseline; gap: .5rem; }
+
+/* ── figures ───────────────────────────────────────────────────────────── */
+figure { margin: 2.1rem 0; }
+.fig-frame { background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: clamp(.9rem,2.4vw,1.6rem); overflow-x: auto; box-shadow: var(--shadow); }
+figure svg { display: block; width: 100%; height: auto; min-width: 30rem; color: var(--ink); }
+figcaption { font-size: .87rem; color: var(--ink-2); line-height: 1.5; margin-top: .85rem; max-width: 62ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+
+/* ── callouts ──────────────────────────────────────────────────────────── */
+.note { border-left: 2px solid var(--accent); background: var(--accent-soft); padding: .95rem 1.15rem; margin: 1.5rem 0; border-radius: 0 3px 3px 0; font-size: .955rem; line-height: 1.55; }
+.note p { margin: 0; } .note p + p { margin-top: .65rem; }
+.note-label { font-family: var(--mono); font-size: .66rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .4rem; }
+.note.warn { border-left-color: var(--ochre); background: var(--ochre-soft); }
+.note.warn .note-label { color: var(--ochre); }
+.note.err { border-left-color: var(--fail); background: var(--fail-soft); }
+.note.err .note-label { color: var(--fail); }
+
+.table-scroll { overflow-x: auto; margin: 1.5rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: .875rem; min-width: 30rem; }
+th, td { text-align: left; padding: .62rem .85rem .62rem 0; border-bottom: 1px solid var(--rule-soft); vertical-align: baseline; }
+th { font-family: var(--mono); font-size: .67rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); border-bottom-color: var(--rule); }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td code { font-size: .8rem; }
+
+.terminal { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px; padding: 1rem 1.15rem; overflow-x: auto; margin: 1.4rem 0; font-family: var(--mono); font-size: .76rem; line-height: 1.75; }
+.terminal .scope-spec { color: var(--accent); }
+.terminal .scope-page { color: var(--ochre); }
+.terminal .ok { color: var(--pass); }
+.terminal .bad { color: var(--fail); }
+.terminal .dim { color: var(--ink-3); }
+
+.gotchas { list-style: none; margin: 1.6rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+.gotchas > li { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: start; }
+.g-tag { font-family: var(--mono); font-size: .64rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: .28rem .5rem; border-radius: 2px; white-space: nowrap; margin-top: .18rem; }
+.g-trap { background: var(--ochre-soft); color: var(--ochre); }
+.g-style { background: var(--accent-soft); color: var(--accent); }
+.g-dead { background: var(--surface-2); color: var(--ink-3); }
+.gotchas h3 { margin: 0 0 .3rem; font-size: 1rem; }
+.gotchas p { margin: 0; font-size: .945rem; color: var(--ink-2); line-height: 1.55; }
+
+footer { padding: clamp(2.4rem,5vw,3.6rem) 0 clamp(3rem,6vw,4.5rem); }
+footer p { font-size: .89rem; color: var(--ink-3); margin: 0; max-width: 62ch; }
+
+
+/* ── worked-example components ─────────────────────────────────────────── */
+.vs { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; margin: 1.6rem 0; }
+@media (min-width: 62rem) { .vs { grid-template-columns: 1fr 1fr; } }
+.vs-pane { background: var(--surface); padding: 1.1rem 1.2rem 1.3rem; }
+.vs-head { display: flex; align-items: baseline; gap: .6rem; margin: 0 0 .9rem; }
+.vs-badge { font-family: var(--mono); font-size: .62rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; padding: .2rem .45rem; border-radius: 2px; }
+.vs-bad  { background: var(--fail-soft); color: var(--fail); }
+.vs-good { background: var(--pass-soft); color: var(--pass); }
+.vs-title { font-family: var(--display); font-weight: 600; font-size: .97rem; margin: 0; }
+.vs-pane .code { margin: 0; font-size: .74rem; }
+.vs-foot { font-size: .87rem; color: var(--ink-2); margin: .9rem 0 0; line-height: 1.5; }
+.vs-foot b { color: var(--ink); font-weight: 600; }
+
+.steps { counter-reset: s; margin: 2rem 0 0; display: flex; flex-direction: column; gap: 2.4rem; }
+.step { display: grid; grid-template-columns: 1fr; gap: .3rem; }
+@media (min-width: 50rem) { .step { grid-template-columns: 3.2rem 1fr; gap: 1.3rem; } }
+.step-n { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; color: var(--rule); line-height: 1; padding-top: .25rem; }
+.step-body > *:first-child { margin-top: 0; }
+.step h3 { margin: 0 0 .55rem; font-size: 1.12rem; }
+.step .code { font-size: .755rem; }
+.pain { border-left: 2px solid var(--fail); background: var(--fail-soft); padding: .8rem 1rem; border-radius: 0 3px 3px 0; margin: 1.1rem 0 0; font-size: .93rem; line-height: 1.5; }
+.pain-label { font-family: var(--mono); font-size: .62rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--fail); display: block; margin-bottom: .35rem; }
+.pain p { margin: 0; } .pain p + p { margin-top: .55rem; }
+.fix { border-left: 2px solid var(--pass); background: var(--pass-soft); padding: .8rem 1rem; border-radius: 0 3px 3px 0; margin: .8rem 0 0; font-size: .93rem; line-height: 1.5; }
+.fix-label { font-family: var(--mono); font-size: .62rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--pass); display: block; margin-bottom: .35rem; }
+.fix p { margin: 0; }
+
+.maprow { display: grid; grid-template-columns: 1fr; gap: .5rem; padding: 1rem 0; border-bottom: 1px solid var(--rule-soft); }
+@media (min-width: 54rem) { .maprow { grid-template-columns: 1.15fr 1fr 1fr; gap: 1.2rem; align-items: start; } }
+.maprow:first-of-type { border-top: 1px solid var(--rule); }
+.mapcell { font-family: var(--mono); font-size: .745rem; line-height: 1.55; word-break: break-word; }
+.mapcell .lbl { display: block; font-size: .6rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: .3rem; }
+.mapcell.html { color: var(--ochre); }
+.mapcell.loc  { color: var(--accent); }
+.mapcell.res  { color: var(--ink-2); font-family: var(--body); font-size: .9rem; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+</style>
+
+<style>
+/* standalone reset — supplies what the artifact host normally injects */
+:root { color-scheme: light dark; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+img, svg, video { max-width: 100%; }
+[hidden] { display: none !important; }
+
+.theme-toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 50;
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--mono); font-size: .68rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: .5rem .7rem; cursor: pointer; box-shadow: var(--shadow);
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+.theme-toggle svg { width: .85rem; height: .85rem; display: block; }
+@media print { .theme-toggle { display: none; } }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch between light and dark theme">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4.5"></circle>
+    <path d="M12 1.5v2M12 20.5v2M3.6 3.6l1.4 1.4M19 19l1.4 1.4M1.5 12h2M20.5 12h2M3.6 20.4L5 19M19 5l1.4-1.4"></path>
+  </svg>
+  <span id="themeLabel">Theme</span>
+</button>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">Playwright · Page Object Model · TTACart</p>
+    <h1>Anatomy of a Test</h1>
+    <p class="standfirst">
+      Your framework turns <strong>three lines of a spec</strong> into a browser session by handing work
+      down five layers. This pulls every file apart <strong>keyword by keyword</strong> — what each word
+      does, what it links to, and what breaks the moment you delete it.
+    </p>
+
+    <div class="transform">
+      <div class="transform-side">
+        <p class="panel-label">You write this</p>
+        <pre class="hero-call"><span class="k" style="color:var(--accent)">await</span> loginPage.loginAs(
+    <span style="color:var(--ochre)">'standard_user'</span>,
+    <span style="color:var(--ochre)">'tta_secret'</span>
+);</pre>
+        <p class="hero-note">One call. No selectors, no URL, no timeouts, no waits.</p>
+      </div>
+      <div class="transform-side">
+        <p class="panel-label">The browser does this</p>
+        <ol class="beat-list">
+          <li class="beat"><span class="beat-n">01</span><span class="beat-do"><em>fill</em> [data-test="username"]</span><span class="beat-budget">15s</span></li>
+          <li class="beat"><span class="beat-n">02</span><span class="beat-do"><em>fill</em> [data-test="password"]</span><span class="beat-budget">15s</span></li>
+          <li class="beat"><span class="beat-n">03</span><span class="beat-do"><em>click</em> [data-test="login-button"]</span><span class="beat-budget">15s</span></li>
+          <li class="beat"><span class="beat-n">04</span><span class="beat-do"><em>poll</em> url has /inventory <span style="color:var(--ink-3)">or</span> error shown</span><span class="beat-budget">10s</span></li>
+        </ol>
+        <p class="hero-note">Every step logged, timed and retried — none of it in your test file.</p>
+      </div>
+    </div>
+
+    <div class="key">
+      <span><span class="d-tag" style="background:var(--accent-soft);color:var(--accent)">Links to</span> where the word connects</span>
+      <span><span class="d-tag" style="background:var(--fail-soft);color:var(--fail)">Delete it</span> what actually breaks</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+
+<!-- ═══ A ════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">A</span><h2>Start here: the same test, written twice</h2></div>
+    <div class="col">
+      <p class="lede">
+        Both versions below log into TTACart and check the form disappeared. Both pass. The difference
+        is what happens to them <em class="term">six months from now</em>.
+      </p>
+    </div>
+
+    <div class="vs">
+      <div class="vs-pane">
+        <div class="vs-head"><span class="vs-badge vs-bad">Without</span><p class="vs-title">Raw Playwright</p></div>
+        <pre class="code"><code><span class="k">import</span> { test, expect } <span class="k">from</span> <span class="s">'@playwright/test'</span>;
+
+test(<span class="s">'login works'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">await</span> page.goto(
+    <span class="s">'https://app.thetestingacademy.com'</span> +
+    <span class="s">'/playwright/ttacart/index.html'</span>
+  );
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="username"]'</span>)
+    .fill(<span class="s">'standard_user'</span>);
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="password"]'</span>)
+    .fill(<span class="s">'tta_secret'</span>);
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="login-button"]'</span>)
+    .click();
+  <span class="k">await</span> expect(
+    page.locator(<span class="s">'[data-test="login-button"]'</span>)
+  ).toBeHidden();
+});</code></pre>
+        <p class="vs-foot">
+          <b>4 selectors and a hardcoded URL, in the test file.</b> Write a second test and you copy
+          them again. Write twenty and the selector lives in twenty places.
+        </p>
+      </div>
+      <div class="vs-pane">
+        <div class="vs-head"><span class="vs-badge vs-good">With</span><p class="vs-title">Your framework</p></div>
+        <pre class="code"><code><span class="k">import</span> { test } <span class="k">from</span> <span class="s">'@playwright/test'</span>;
+<span class="k">import</span> { LoginPage } <span class="k">from</span> <span class="s">'@pages/LoginPage'</span>;
+
+test(<span class="s">'login works'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">const</span> loginPage = <span class="k">new</span> LoginPage(page);
+
+  <span class="k">await</span> loginPage.open();
+  <span class="k">await</span> loginPage.loginAs(
+    <span class="s">'standard_user'</span>,
+    <span class="s">'tta_secret'</span>
+  );
+  <span class="k">await</span> loginPage.waitForLoginButtonHidden();
+});</code></pre>
+        <p class="vs-foot">
+          <b>Zero selectors, zero URLs, zero timeouts.</b> Reads like the manual test case someone
+          wrote in a spreadsheet. When the app changes, this file does not.
+        </p>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="note">
+        <span class="note-label">The trade</span>
+        <p>
+          The right-hand version is shorter, but the code did not vanish — it moved into
+          <code>LoginPage.ts</code>, where it is written <strong>once</strong> and reused by every
+          test. That is the entire bargain of the Page Object Model, and everything else on this page
+          is detail about how your framework spends it.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ B ════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">B</span><h2>How the layers got there</h2></div>
+    <div class="col">
+      <p class="lede">
+        Nobody designs five layers up front. Each one exists because the previous version hurt in a
+        specific way. Here is that sequence, with the pain that forced each move.
+      </p>
+    </div>
+
+    <div class="steps col">
+
+      <div class="step">
+        <div class="step-n">00</div>
+        <div class="step-body">
+          <h3>Everything in the test</h3>
+          <p>You write one test. It works. Then you write the second one.</p>
+          <pre class="code"><code>test(<span class="s">'login works'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="username"]'</span>).fill(<span class="s">'standard_user'</span>);
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="password"]'</span>).fill(<span class="s">'tta_secret'</span>);
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="login-button"]'</span>).click();
+});
+
+test(<span class="s">'checkout works'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="c">// the same three lines again, copied</span>
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="username"]'</span>).fill(<span class="s">'standard_user'</span>);
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="password"]'</span>).fill(<span class="s">'tta_secret'</span>);
+  <span class="k">await</span> page.locator(<span class="s">'[data-test="login-button"]'</span>).click();
+  <span class="c">// ... then the actual checkout steps</span>
+});</code></pre>
+          <div class="pain">
+            <span class="pain-label">What hurts</span>
+            <p>
+              Every test that needs a logged-in user repeats the login. Rename
+              <code>data-test="username"</code> and you must find and fix all of them — and the compiler
+              cannot help, because they are just strings.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">01</div>
+        <div class="step-body">
+          <h3>Extract the page → <code>LoginPage</code></h3>
+          <p>Move the selectors and the steps into a class that owns the login screen.</p>
+          <pre class="code"><code><span class="k">export class</span> LoginPage {
+    <span class="k">private readonly</span> usernameInput: Locator;
+    <span class="k">private readonly</span> passwordInput: Locator;
+    <span class="k">private readonly</span> loginButton: Locator;
+
+    <span class="k">constructor</span>(<span class="k">private</span> page: Page) {
+        <span class="k">this</span>.usernameInput = page.locator(<span class="s">'[data-test="username"]'</span>);
+        <span class="k">this</span>.passwordInput = page.locator(<span class="s">'[data-test="password"]'</span>);
+        <span class="k">this</span>.loginButton   = page.locator(<span class="s">'[data-test="login-button"]'</span>);
+    }
+
+    <span class="k">async</span> loginAs(u: <span class="k">string</span>, p: <span class="k">string</span>) {
+        <span class="k">await this</span>.usernameInput.fill(u);
+        <span class="k">await this</span>.passwordInput.fill(p);
+        <span class="k">await this</span>.loginButton.click();
+    }
+}</code></pre>
+          <div class="fix">
+            <span class="fix-label">Fixed</span>
+            <p>The selector now exists once. Both tests call <code>loginAs()</code> and neither knows what a <code>data-test</code> attribute is.</p>
+          </div>
+          <div class="pain">
+            <span class="pain-label">What still hurts</span>
+            <p>
+              Now write <code>InventoryPage</code>, <code>CartPage</code>, and five checkout pages. Each
+              one re-declares <code>private page: Page</code>, each builds its own logger, each writes
+              its own <code>goto()</code>. Seven copies of the same three lines.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">02</div>
+        <div class="step-body">
+          <h3>Extract what every page shares → <code>BasePage</code></h3>
+          <p>Anything all seven pages need moves up into a parent they all extend.</p>
+          <pre class="code"><code><span class="k">export abstract class</span> BasePage {
+    <span class="k">protected readonly</span> page: Page;
+    <span class="k">protected readonly</span> el:   UtilElementLocator;
+    <span class="k">protected readonly</span> log:  Logger;
+
+    <span class="k">protected constructor</span>(page: Page, scope: <span class="k">string</span>) {
+        <span class="k">this</span>.page = page;
+        <span class="k">this</span>.el   = <span class="k">new</span> UtilElementLocator(page, scope);
+        <span class="k">this</span>.log  = createLogger(scope);
+    }
+    <span class="k">protected async</span> goto(path: <span class="k">string</span>) { <span class="c">/* … */</span> }
+}
+
+<span class="c">// LoginPage shrinks to just what is unique about the login screen:</span>
+<span class="k">export class</span> LoginPage <span class="k">extends</span> BasePage {
+    <span class="k">constructor</span>(page: Page) { <span class="k">super</span>(page, <span class="s">'LoginPage'</span>); <span class="c">/* … */</span> }
+}</code></pre>
+          <div class="fix">
+            <span class="fix-label">Fixed</span>
+            <p>Seven page classes now share one copy of the plumbing, and every one gets a logger tagged with its own name for free.</p>
+          </div>
+          <div class="pain">
+            <span class="pain-label">What still hurts</span>
+            <p>
+              Every action is still a bare <code>locator.click()</code>. There is no logging of what
+              was clicked, and no shared timeout — so when a test fails you get "timeout exceeded" with
+              no record of what it was trying to do.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">03</div>
+        <div class="step-body">
+          <h3>Wrap the actions → <code>UtilElementLocator</code></h3>
+          <p>One class stands between the pages and Playwright, so logging and timeouts are decided in a single place.</p>
+          <pre class="code"><code><span class="k">async</span> click(target: Flex, timeout = DEFAULT_ACTION_TIMEOUT_MS) {
+    <span class="k">const</span> loc = <span class="k">this</span>.toLocator(target);
+    <span class="k">this</span>.log.debug(<span class="s">`Click ${this.describe(target)}`</span>);   <span class="c">// ← now every click is traceable</span>
+    <span class="k">await</span> loc.click({ timeout });                     <span class="c">// ← one number governs all of them</span>
+}</code></pre>
+          <div class="fix">
+            <span class="fix-label">Fixed</span>
+            <p>
+              Set <code>LOG_LEVEL=debug</code> and you get a full record of every interaction. Change
+              <code>DEFAULT_ACTION_TIMEOUT_MS</code> once and every wait in the suite retunes.
+            </p>
+          </div>
+          <div class="pain">
+            <span class="pain-label">What still hurts</span>
+            <p>
+              Every spec still opens with the same ceremony: declare a variable, construct the page in
+              <code>beforeEach</code>, log in, navigate. Tests that need a logged-in user repeat that
+              setup verbatim.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">04</div>
+        <div class="step-body">
+          <h3>Hand the setup over → fixtures</h3>
+          <p>Ask for the state you want by name and Playwright builds it, plus everything it depends on.</p>
+          <pre class="code"><code><span class="c">// src/fixtures/test-base.ts</span>
+loginWithInventory: <span class="k">async</span> ({ validLogin, inventoryPage }, use) =&gt; {
+    <span class="k">await</span> inventoryPage.assertLoaded();
+    <span class="k">await</span> use(inventoryPage);
+},
+
+<span class="c">// any spec — no beforeEach, no `new`, no login steps</span>
+test(<span class="s">'adds an item'</span>, <span class="k">async</span> ({ <span class="hl">loginWithInventory</span> }) =&gt; {
+    <span class="k">await</span> loginWithInventory.addToCart(<span class="s">'tta-bike-light'</span>);
+});</code></pre>
+          <div class="fix">
+            <span class="fix-label">Fixed</span>
+            <p>
+              That test is already logged in and already on the inventory page, because naming the
+              fixture triggered the whole chain: <code>validLogin</code> →
+              <code>loginWithInventory</code>. Playwright builds only the fixtures a test actually
+              names, so nothing is set up that the test does not use.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ C ════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">C</span><h2>From real HTML to a passing assertion</h2></div>
+    <div class="col">
+      <p class="lede">
+        This is the actual login markup, pulled from a trace your own suite recorded. Here is what each
+        locator in <code>LoginPage</code> is pointing at.
+      </p>
+
+      <span class="filename">TTACart login page — real DOM</span>
+      <pre class="code"><code>&lt;div class=<span class="s">"login-card"</span> data-test=<span class="s">"login-container"</span>&gt;
+  &lt;form id=<span class="s">"login-form"</span>&gt;
+    &lt;div class=<span class="s">"field"</span>&gt;
+      &lt;input id=<span class="s">"user-name"</span> name=<span class="s">"user-name"</span> type=<span class="s">"text"</span>
+             placeholder=<span class="s">"Username"</span> <span class="hl">data-test=<span class="s">"username"</span></span>&gt;
+    &lt;/div&gt;
+    &lt;div class=<span class="s">"field"</span>&gt;
+      &lt;input id=<span class="s">"password"</span> name=<span class="s">"password"</span> type=<span class="s">"password"</span>
+             placeholder=<span class="s">"Password"</span> <span class="hl">data-test=<span class="s">"password"</span></span>&gt;
+    &lt;/div&gt;
+    &lt;div class=<span class="s">"login-error"</span> id=<span class="s">"login-error"</span> <span class="hl">data-test=<span class="s">"error"</span></span>&gt;&lt;/div&gt;
+    &lt;button type=<span class="s">"submit"</span> class=<span class="s">"login-btn"</span> id=<span class="s">"login-button"</span>
+            <span class="hl">data-test=<span class="s">"login-button"</span></span>&gt;Login&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/div&gt;</code></pre>
+      <p>
+        Note the error <code>&lt;div&gt;</code> is <strong>always in the DOM</strong> — it is empty and
+        hidden until a login fails. That is exactly why <code>loginAs</code> checks
+        <code>errorBox.isVisible()</code> rather than checking whether the element exists: it always
+        exists.
+      </p>
+    </div>
+
+    <div class="col">
+      <h4>Locator by locator</h4>
+      <div class="maprow">
+        <div class="mapcell html"><span class="lbl">In the page</span>&lt;input data-test="username"&gt;</div>
+        <div class="mapcell loc"><span class="lbl">In LoginPage.ts</span>page.locator('[data-test="username"]')</div>
+        <div class="mapcell res"><span class="lbl">What happens</span><code>el.fill()</code> types the username into it.</div>
+      </div>
+      <div class="maprow">
+        <div class="mapcell html"><span class="lbl">In the page</span>&lt;input data-test="password"&gt;</div>
+        <div class="mapcell loc"><span class="lbl">In LoginPage.ts</span>page.locator('[data-test="password"]')</div>
+        <div class="mapcell res"><span class="lbl">What happens</span><code>el.fill()</code> types the password.</div>
+      </div>
+      <div class="maprow">
+        <div class="mapcell html"><span class="lbl">In the page</span>&lt;button data-test="login-button"&gt;</div>
+        <div class="mapcell loc"><span class="lbl">In LoginPage.ts</span>page.locator('[data-test="login-button"]')</div>
+        <div class="mapcell res"><span class="lbl">What happens</span>Clicked to submit; later asserted <em>hidden</em> to prove login succeeded.</div>
+      </div>
+      <div class="maprow">
+        <div class="mapcell html"><span class="lbl">In the page</span>&lt;div data-test="error"&gt; <em style="opacity:.6">(empty, hidden)</em></div>
+        <div class="mapcell loc"><span class="lbl">In LoginPage.ts</span>page.locator('[data-test="error"]')</div>
+        <div class="mapcell res"><span class="lbl">What happens</span>Polled by <code>loginAs</code> as the "login was rejected" signal.</div>
+      </div>
+
+      <div class="note warn">
+        <span class="note-label">Why not #user-name or .login-btn</span>
+        <p>
+          Both exist in that markup and both would work today. But <code>class="login-btn"</code>
+          belongs to the designer and <code>id="user-name"</code> belongs to the form logic — either can
+          change for reasons that have nothing to do with your test. <code>data-test</code> attributes
+          exist for one audience only, so they change only when someone means to change them.
+        </p>
+      </div>
+
+      <h4>The credentials are printed on the page</h4>
+      <p>
+        TTACart lists its own valid accounts in the markup, which is where the values in your test data
+        come from:
+      </p>
+      <pre class="code"><code>&lt;p data-test=<span class="s">"login-credentials"</span>&gt;
+  standard_user, locked_out_user, problem_user,
+  performance_glitch_user, error_user, visual_user
+&lt;/p&gt;
+&lt;p data-test=<span class="s">"login-password"</span>&gt;tta_secret&lt;/p&gt;</code></pre>
+      <p>
+        <code>standard_user</code> is the happy path your login spec uses;
+        <code>locked_out_user</code> is the one the <code>invalidLogin</code> fixture uses to prove the
+        error branch works.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 01 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">01</span><h2>Reference: five layers, each ignorant of the next</h2></div>
+    <div class="col">
+      <p class="lede">
+        The rule that makes the whole thing work: <em class="term">a layer may only talk to the layer
+        directly beneath it.</em> Your spec never touches a CSS selector. Your page object never sets a
+        timeout. Nothing but the bottom layer touches the browser.
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 800 476" role="img" aria-label="Five stacked layers from login.spec.ts down to the Playwright API, each passing one specific call to the layer beneath it">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+          <rect x="30" y="16" width="400" height="62" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <text x="48" y="42" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="currentColor">login.spec.ts</text>
+          <text x="48" y="62" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".62">WHAT to test</text>
+          <text x="452" y="42" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".82">knows: step names, tags</text>
+          <text x="452" y="60" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".45">never: selectors, URLs</text>
+          <line x1="230" y1="78" x2="230" y2="104" stroke="#2F4BD8" stroke-width="1.6" marker-end="url(#ar)"/>
+          <text x="244" y="96" font-family="JetBrains Mono, monospace" font-size="11" fill="#2F4BD8">loginAs('standard_user', …)</text>
+
+          <rect x="30" y="104" width="400" height="62" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <text x="48" y="130" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="currentColor">LoginPage.ts</text>
+          <text x="48" y="150" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".62">WHERE things are</text>
+          <text x="452" y="130" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".82">knows: 5 locators, PATH</text>
+          <text x="452" y="148" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".45">never: timeout values</text>
+          <line x1="230" y1="166" x2="230" y2="192" stroke="#2F4BD8" stroke-width="1.6" marker-end="url(#ar)"/>
+          <text x="244" y="184" font-family="JetBrains Mono, monospace" font-size="11" fill="#2F4BD8">super(page, 'LoginPage')</text>
+
+          <rect x="30" y="192" width="400" height="62" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <text x="48" y="218" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="currentColor">BasePage.ts</text>
+          <text x="48" y="238" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".62">what EVERY page gets</text>
+          <text x="452" y="218" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".82">gives: page · el · log · goto()</text>
+          <text x="452" y="236" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".45">never: a single locator</text>
+          <line x1="230" y1="254" x2="230" y2="280" stroke="#2F4BD8" stroke-width="1.6" marker-end="url(#ar)"/>
+          <text x="244" y="272" font-family="JetBrains Mono, monospace" font-size="11" fill="#2F4BD8">this.el.fill(locator, value)</text>
+
+          <rect x="30" y="280" width="400" height="62" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <text x="48" y="306" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="currentColor">UtilElementLocator.ts</text>
+          <text x="48" y="326" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".62">HOW to act</text>
+          <text x="452" y="306" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".82">adds: 15s timeout + debug log</text>
+          <text x="452" y="324" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".45">never: what page it's on</text>
+          <line x1="230" y1="342" x2="230" y2="368" stroke="#2F4BD8" stroke-width="1.6" marker-end="url(#ar)"/>
+          <text x="244" y="360" font-family="JetBrains Mono, monospace" font-size="11" fill="#2F4BD8">loc.fill(value, { timeout: 15000 })</text>
+
+          <rect x="30" y="368" width="400" height="62" rx="3" fill="#2F4BD8" fill-opacity=".08" stroke="#2F4BD8" stroke-width="1.4"/>
+          <text x="48" y="394" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="currentColor">Playwright API</text>
+          <text x="48" y="414" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".62">the real browser</text>
+          <text x="452" y="394" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".82">touches: the actual DOM</text>
+
+          <line x1="16" y1="16" x2="16" y2="166" stroke="currentColor" stroke-width="1" opacity=".3"/>
+          <text x="8" y="96" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".55" transform="rotate(-90 8 96)" text-anchor="middle">YOUR TESTS</text>
+          <line x1="16" y1="192" x2="16" y2="430" stroke="currentColor" stroke-width="1" opacity=".3"/>
+          <text x="8" y="311" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".55" transform="rotate(-90 8 311)" text-anchor="middle">THE FRAMEWORK</text>
+          <text x="30" y="462" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" opacity=".55">Each arrow is the only vocabulary the layer above is allowed to use.</text>
+        </svg>
+      </div>
+      <figcaption><b>The delegation chain.</b> Each arrow is a call, and it is the <em>entire</em> surface the upper layer gets. Because <code>loginAs</code> is all the spec can say, the spec cannot break when a selector changes.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ═══ 02 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">02</span><h2>The import lines</h2></div>
+    <div class="col">
+      <p class="lede">Before any class exists, four words at the top of each file decide what the file can see.</p>
+
+      <span class="filename">src/pages/BasePage.ts — lines 15–17</span>
+      <pre class="code"><code><span class="k">import</span> { Page } <span class="k">from</span> <span class="s">"@playwright/test"</span>;
+<span class="k">import</span> { UtilElementLocator } <span class="k">from</span> <span class="s">"@utils/UtilElementLocators"</span>;
+<span class="k">import</span> { createLogger, <span class="k">type</span> Logger } <span class="k">from</span> <span class="s">"@utils/logger"</span>;</code></pre>
+
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">import { Page }</code>
+          <div class="d-body">
+            <p class="d-what">Pulls in Playwright's <code>Page</code> <em>type</em> — the TypeScript description of a browser tab. It is used only to annotate parameters and fields; no value is created from it.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>node_modules/@playwright/test</code>. The same <code>Page</code> object is handed to your test at runtime by Playwright's <code>{ page }</code> fixture.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><b>Compile error</b> on every mention of <code>Page</code>: <code>Cannot find name 'Page'</code>. Tests won't run at all.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">"@playwright/test"<br><span class="muted">not "playwright"</span></code>
+          <div class="d-body">
+            <p class="d-what">Two different packages exist. <code>playwright</code> is the raw browser-automation library; <code>@playwright/test</code> is the <em>test runner</em> built on top of it, and it is the one that gives you <code>test</code>, <code>expect</code>, fixtures, retries and reporters.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Everything in <code>playwright.config.ts</code> — timeouts, projects, reporters — configures <code>@playwright/test</code>, not <code>playwright</code>.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Importing from <code>playwright</code> instead gives you a <code>Page</code> that type-checks, but you lose <code>expect</code>'s auto-retry and every config value. Waits stop being retried.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">"@utils/…"<br><span class="muted">the @ prefix</span></code>
+          <div class="d-body">
+            <p class="d-what">A <em class="term">path alias</em>, not a real folder. It stands in for <code>src/utils/</code> so you never write <code>../../../utils/logger</code>.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>tsconfig.json</code> → <code>compilerOptions.paths</code>, where <code>"@utils/*"</code> maps to <code>["src/utils/*"]</code>. Playwright reads that mapping itself at run time, which is why it works in specs without any extra plugin.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Remove the entry from <code>tsconfig.json</code> and every aliased import fails with <code>Cannot find module '@utils/logger'</code>. The alias only exists because that config says so.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">type Logger</code>
+          <div class="d-body">
+            <p class="d-what">The <code>type</code> keyword marks this import as <em>types only</em>. It is erased entirely when TypeScript compiles — no JavaScript is emitted for it.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>src/utils/logger.ts</code>, which exports both a value (<code>createLogger</code>) and a type (<code>Logger</code>). One import line takes both, marking which is which.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Dropping just the word <code>type</code> still works here, but the import is no longer guaranteed to vanish at build time — it can drag a real runtime dependency into the output for something you only needed for type-checking.</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 03 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">03</span><h2>BasePage — dissected</h2></div>
+    <div class="col">
+      <p class="lede">Thirty-six lines every page object is built on. It holds <em class="term">behaviour</em>, never selectors.</p>
+
+      <span class="filename">src/pages/BasePage.ts</span>
+      <pre class="code"><code><span class="k">export abstract class</span> BasePage
+{
+    <span class="k">protected readonly</span> page: Page;
+    <span class="k">protected readonly</span> el:   UtilElementLocator;
+    <span class="k">protected readonly</span> log:  Logger;
+
+    <span class="k">protected constructor</span>(page: Page, scope: <span class="k">string</span>)
+    {
+        <span class="k">this</span>.page = page;
+        <span class="k">this</span>.el   = <span class="k">new</span> UtilElementLocator(page, scope);
+        <span class="k">this</span>.log  = createLogger(scope);
+    }
+
+    <span class="k">protected async</span> goto(relativePath: <span class="k">string</span>): Promise&lt;<span class="k">void</span>&gt;
+    {
+        <span class="k">await this</span>.page.goto(relativePath);
+        <span class="k">await this</span>.page.waitForLoadState(<span class="s">"domcontentloaded"</span>);
+    }
+}</code></pre>
+
+      <h4>The class declaration</h4>
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">export</code>
+          <div class="d-body">
+            <p class="d-what">Makes the class visible outside this file. Without it the class is private to <code>BasePage.ts</code>.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>import { BasePage } from './BasePage'</code> at the top of <code>LoginPage.ts</code> and all six other page objects.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><b>Every page object fails to compile</b>: <code>Module '"./BasePage"' has no exported member 'BasePage'</code>. The entire POM layer collapses.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">abstract</code>
+          <div class="d-body">
+            <p class="d-what">Declares that this class is incomplete on purpose — it exists to be extended, never instantiated directly.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Every <code>class X extends BasePage</code>. It is the formal statement of "this is scaffolding".</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Nothing breaks immediately, but <code>new BasePage(page, 'x')</code> becomes legal — someone can create a page object that represents no page, with no locators and no <code>open()</code>. The word is a guard-rail, and removing it removes the guard.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <h4>The three fields</h4>
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">protected</code>
+          <div class="d-body">
+            <p class="d-what">Visible to this class <em>and its subclasses</em>, invisible to everyone else. This single word is what enforces the whole Page Object discipline.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>this.el</code> and <code>this.log</code> inside <code>LoginPage</code> — a subclass, so allowed. And to your spec, which is <em>not</em> a subclass, so denied.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Fields default to <code>public</code>. A spec could then write <code>loginPage.page.locator('[data-test="username"]').fill('x')</code> — raw selectors leak straight back into test files and the abstraction is worth nothing. <b>This is the most consequential keyword in the file.</b></span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">readonly</code>
+          <div class="d-body">
+            <p class="d-what">The field may be assigned once, in the constructor, and never reassigned afterwards.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The three assignments in the constructor body — the only place the compiler permits them.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>A method could later do <code>this.page = someOtherPage</code>, silently re-pointing the page object at a different browser tab mid-test. Failures from that are extremely hard to trace.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">: Page<br><span class="muted">the annotation</span></code>
+          <div class="d-body">
+            <p class="d-what">Declares the field's type, so the editor knows <code>this.page.goto()</code> exists and <code>this.page.gogo()</code> does not.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The <code>Page</code> import at the top of the file.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Under <code>"strict": true</code> in your <code>tsconfig.json</code>, an un-annotated field with no initialiser is an error. Loosen that and it becomes <code>any</code> — you lose autocomplete and every typo becomes a runtime failure instead of a red squiggle.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <h4>The constructor</h4>
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">protected constructor</code>
+          <div class="d-body">
+            <p class="d-what">Only a subclass may call it. Together with <code>abstract</code> this is a second, independent lock on direct instantiation.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>super(page, 'LoginPage')</code> — a subclass calling up into it.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>It becomes <code>public</code>. Combined with removing <code>abstract</code>, anyone can instantiate the base class. Alone, <code>abstract</code> still blocks it — the two overlap deliberately.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">scope: string</code>
+          <div class="d-body">
+            <p class="d-what">A plain label — the subclass's own name. It is the single most reused value in the framework.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Two places at once: <code>new UtilElementLocator(page, scope)</code> and <code>createLogger(scope)</code>. See the fan-out diagram below.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Every log line loses its <code>[LoginPage]</code> tag. Your terminal output becomes an undifferentiated stream where you cannot tell which page emitted which action — the single most useful debugging affordance in the suite.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">this.</code>
+          <div class="d-body">
+            <p class="d-what">Refers to the specific object being constructed. <code>this.page = page</code> copies the constructor's parameter onto the instance so other methods can reach it later.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Every later use — <code>this.el.fill(...)</code> in <code>LoginPage.loginAs</code> reads the field written here.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Writing <code>page = page</code> assigns the parameter to itself. It compiles, does nothing, and <code>this.page</code> stays <code>undefined</code> — every later call dies with <code>Cannot read properties of undefined</code>.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">new</code>
+          <div class="d-body">
+            <p class="d-what">Actually constructs a <code>UtilElementLocator</code>. Each page object gets its own instance, carrying its own scope.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The <code>UtilElementLocator</code> constructor, which stores the page and builds its own scoped logger.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><code>this.el = UtilElementLocator(page, scope)</code> throws at run time: <code>Class constructor cannot be invoked without 'new'</code>.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <h4>The goto helper</h4>
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">async</code>
+          <div class="d-body">
+            <p class="d-what">Marks the function as asynchronous — it returns a Promise, and it is allowed to use <code>await</code> inside.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The <code>await this.goto(...)</code> in <code>LoginPage.open()</code>.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><code>await</code> inside the body becomes a syntax error. Browser work is inherently asynchronous, so this keyword is not optional.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">await</code>
+          <div class="d-body">
+            <p class="d-what">Pauses this function until the Promise settles. It is what makes asynchronous code execute in the order you wrote it.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Every Playwright call, all of which return Promises.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><b>The single most common bug in Playwright code.</b> Without it, <code>page.goto()</code> starts and immediately returns. The next line runs against a page that has not navigated yet. You get flaky failures that pass locally and fail in CI, plus an unhandled promise rejection if it throws.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">Promise&lt;void&gt;</code>
+          <div class="d-body">
+            <p class="d-what">The return type. <code>Promise</code> because it is <code>async</code>; <code>&lt;void&gt;</code> because it resolves with no value.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The caller's <code>await</code>, which unwraps the Promise.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>TypeScript infers it correctly anyway. Purely documentation — but it stops a future edit from silently changing what the method returns.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">relativePath<br><span class="muted">not a full URL</span></code>
+          <div class="d-body">
+            <p class="d-what">A path fragment like <code>/playwright/ttacart/index.html</code>. Playwright joins it onto <code>baseURL</code>.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>resolveBaseURL()</code> in <code>playwright.config.ts</code>, which reads <code>TTA_ENV</code> and <code>BASE_URL</code> from your <code>.env</code>.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Hardcode a full <code>https://…</code> URL instead and the page object is welded to one environment. Switching <code>TTA_ENV=stg</code> would silently keep hitting production.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">"domcontentloaded"</code>
+          <div class="d-body">
+            <p class="d-what">Waits until the HTML is parsed — deliberately <em>not</em> waiting for images, fonts or network idle.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Its slower siblings <code>'load'</code> and <code>'networkidle'</code>. <code>UtilElementLocator.waitForPageLoad()</code> uses <code>networkidle</code>, wrapped in <code>.catch()</code> precisely because it is unreliable.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Drop the whole line and <code>goto()</code> may return before the DOM is parsed, so the first locator query can miss. Change it to <code>'networkidle'</code> and every navigation stalls on background analytics requests.</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 800 268" role="img" aria-label="The scope string LoginPage passed once to super, fanning out to both a UtilElementLocator logger and a page logger, producing identically tagged log lines">
+          <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+          <rect x="238" y="14" width="324" height="42" rx="3" fill="#2F4BD8" fill-opacity=".1" stroke="#2F4BD8" stroke-width="1.4"/>
+          <text x="400" y="40" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" fill="currentColor" text-anchor="middle">super(page, 'LoginPage')</text>
+          <text x="400" y="76" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".6" text-anchor="middle">one string, written once in the LoginPage constructor</text>
+          <path d="M 340 56 L 340 74 L 178 74 L 178 100" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".7" marker-end="url(#ar2)"/>
+          <path d="M 460 56 L 460 74 L 622 74 L 622 100" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".7" marker-end="url(#ar2)"/>
+          <rect x="34" y="100" width="288" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <text x="178" y="124" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" text-anchor="middle">new UtilElementLocator(page, scope)</text>
+          <text x="178" y="143" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".6" text-anchor="middle">tags every click / fill / wait</text>
+          <rect x="478" y="100" width="288" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <text x="622" y="124" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" text-anchor="middle">createLogger(scope)</text>
+          <text x="622" y="143" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".6" text-anchor="middle">tags your own this.log lines</text>
+          <path d="M 178 156 L 178 186 L 400 186 L 400 206" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".7" marker-end="url(#ar2)"/>
+          <path d="M 622 156 L 622 186 L 400 186" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".7"/>
+          <rect x="196" y="206" width="408" height="46" rx="3" fill="#A2690F" fill-opacity=".1" stroke="#A2690F" stroke-width="1.4"/>
+          <text x="400" y="234" font-family="JetBrains Mono, monospace" font-size="12.5" font-weight="700" fill="currentColor" text-anchor="middle">14:41:39 [info] [LoginPage] loginAs standard_user</text>
+        </svg>
+      </div>
+      <figcaption><b>Why your log lines are tagged.</b> The scope string reaches two separate loggers, which is why an action deep inside <code>UtilElementLocator</code> and a message you wrote in <code>LoginPage</code> both print as <code>[LoginPage]</code>.</figcaption>
+    </figure>
+
+    <div class="col">
+      <div class="terminal">
+<span class="dim">14:41:39 [info]</span> <span class="scope-spec">[login.spec]</span> Opening the TTACart login page<br>
+<span class="dim">14:41:39 [info]</span> <span class="scope-page">[LoginPage]</span>&nbsp; Open login pgae<br>
+<span class="dim">14:41:41 [info]</span> <span class="scope-spec">[login.spec]</span> Logging in as standard_user<br>
+<span class="dim">14:41:41 [info]</span> <span class="scope-page">[LoginPage]</span>&nbsp; loginAs standard_user<br>
+<span class="ok">&nbsp;✓ 1 [chromium] › login.spec.ts:21 › logs in with valid credentials @p0 (4.0s)</span>
+      </div>
+      <div class="note">
+        <span class="note-label">Turn on the hidden half</span>
+        <p>Every <code>el.click</code> and <code>el.fill</code> also logs — but at <code>debug</code> level, and your <code>.env</code> sets <code>LOG_LEVEL=info</code>. Set <code>LOG_LEVEL=debug</code> and the same run prints every individual interaction with its selector.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 04 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">04</span><h2>UtilElementLocator — where waiting is decided</h2></div>
+    <div class="col">
+      <p class="lede"><code>BasePage</code> hands every page a <code>this.el</code>. It does three jobs, and the third has a consequence most people miss.</p>
+
+      <pre class="code"><code><span class="k">export type</span> Flex = <span class="k">string</span> | Locator;
+
+<span class="k">private</span> toLocator(target: Flex): Locator {
+    <span class="k">return typeof</span> target === <span class="s">'string'</span> ? <span class="k">this</span>.page.locator(target) : target;
+}
+
+<span class="k">export const</span> DEFAULT_ACTION_TIMEOUT_MS = <span class="hl">15_000</span>;
+
+<span class="k">async</span> click(target: Flex, timeout = DEFAULT_ACTION_TIMEOUT_MS) {
+    <span class="k">const</span> loc = <span class="k">this</span>.toLocator(target);
+    <span class="k">this</span>.log.debug(<span class="s">`Click ${this.describe(target)}`</span>);
+    <span class="k">await</span> loc.click(<span class="hl">{ timeout }</span>);
+}</code></pre>
+
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">type Flex =<br>string | Locator</code>
+          <div class="d-body">
+            <p class="d-what">A <em class="term">union type</em>. The <code>|</code> means "either of these". It lets every method accept a raw CSS string <em>or</em> an already-built Playwright <code>Locator</code>.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>toLocator()</code>, which normalises whichever form arrived. <code>LoginPage</code> always passes the second form — objects built once in its constructor.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Accept only <code>string</code> and page objects can no longer pass their pre-built locators — every call site would rebuild locators from strings, losing Playwright's chaining and <code>.filter()</code> features. Accept only <code>Locator</code> and quick one-off calls get verbose.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">private</code>
+          <div class="d-body">
+            <p class="d-what">Visible only inside this class — stricter than <code>protected</code>, which also allows subclasses.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Only the methods in this same file. <code>toLocator</code> is plumbing nobody else should call.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>It becomes public API you now have to keep stable. Callers could bypass the logging and timeout wrapper entirely by calling <code>toLocator</code> and acting on the result directly.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">15_000<br><span class="muted">the underscore</span></code>
+          <div class="d-body">
+            <p class="d-what">A numeric separator — pure readability. <code>15_000</code> and <code>15000</code> are the identical number to JavaScript.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Every method's default parameter, and therefore every element interaction in the entire suite.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Nothing — it is cosmetic. But delete the whole <em>constant</em> and every timeout has to be written out at each call site, so tuning them means editing dozens of lines instead of one.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">timeout =<br>DEFAULT_ACTION…</code>
+          <div class="d-body">
+            <p class="d-what">A <em class="term">default parameter</em>. Callers may pass their own timeout; almost none do, so the constant applies nearly everywhere.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The one place a page object might override it for a genuinely slow control.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Every caller must now pass a timeout explicitly, or you fall back to Playwright's global default — and you lose the single knob that controls all element waits.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">{ timeout }</code>
+          <div class="d-body">
+            <p class="d-what">Object shorthand for <code>{ timeout: timeout }</code>. This is the line that makes the framework's timeout <strong>win over Playwright's configured default</strong>, because an explicit option always beats a config value.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>expect: { timeout: 10_000 }</code> in <code>playwright.config.ts</code> — which this <em>overrides</em>. See the budget diagram below.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>All element waits fall back to the config's timeouts. Arguably simpler — but <code>DEFAULT_ACTION_TIMEOUT_MS</code> would then be dead code that appears to do something and does not.</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 800 250" role="img" aria-label="Three timeout budgets drawn to scale: a 60 second test timeout, a 15 second element action timeout, and a 10 second expect poll timeout">
+          <text x="30" y="22" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".55">DRAWN TO SCALE — 60 SECONDS ACROSS</text>
+          <text x="30" y="56" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">whole test</text>
+          <rect x="180" y="42" width="590" height="26" rx="2" fill="currentColor" fill-opacity=".1" stroke="currentColor" stroke-width="1.2" opacity=".7"/>
+          <text x="192" y="60" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="currentColor">60s</text>
+          <text x="758" y="60" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6" text-anchor="end">playwright.config.ts</text>
+          <text x="30" y="112" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">this.el.*</text>
+          <text x="30" y="128" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".55">fill · click · wait</text>
+          <rect x="180" y="98" width="147.5" height="26" rx="2" fill="#A2690F" fill-opacity=".16" stroke="#A2690F" stroke-width="1.4"/>
+          <text x="192" y="116" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="currentColor">15s</text>
+          <text x="340" y="116" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#A2690F">DEFAULT_ACTION_TIMEOUT_MS</text>
+          <text x="30" y="168" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">expect.poll</text>
+          <text x="30" y="184" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".55">inside loginAs</text>
+          <rect x="180" y="154" width="98.3" height="26" rx="2" fill="#2F4BD8" fill-opacity=".16" stroke="#2F4BD8" stroke-width="1.4"/>
+          <text x="192" y="172" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="currentColor">10s</text>
+          <text x="291" y="172" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#2F4BD8">expect: { timeout } in config</text>
+          <line x1="180" y1="200" x2="770" y2="200" stroke="currentColor" stroke-width="1" opacity=".25"/>
+          <text x="180" y="216" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity=".5">0s</text>
+          <text x="475" y="216" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity=".5" text-anchor="middle">30s</text>
+          <text x="770" y="216" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity=".5" text-anchor="end">60s</text>
+          <text x="180" y="240" font-family="JetBrains Mono, monospace" font-size="11" fill="#A2690F">The config's expect timeout does NOT govern this.el.* — those pass their own 15s.</text>
+        </svg>
+      </div>
+      <figcaption><b>Three clocks, two sources.</b> Tuning timeouts means editing <em>both</em> <code>playwright.config.ts</code> and <code>DEFAULT_ACTION_TIMEOUT_MS</code>.</figcaption>
+    </figure>
+
+    <div class="col">
+      <h3>Its waits are assertions in disguise</h3>
+      <pre class="code"><code><span class="k">async</span> waitForHidden(target: Flex, timeout = DEFAULT_ACTION_TIMEOUT_MS) {
+    <span class="k">await</span> expect(<span class="k">this</span>.toLocator(target)).toBeHidden({ timeout });
+}</code></pre>
+      <div class="note warn">
+        <span class="note-label">Why this matters</span>
+        <p>This is <strong>not</strong> <code>page.waitForTimeout(15000)</code>, which would sleep blindly for fifteen seconds every time. <code>expect().toBeHidden()</code> re-checks continuously and returns the <em>instant</em> the condition is true — usually in milliseconds — and only fails if the full budget expires.</p>
+        <p>Replace it with a fixed sleep and your suite gets slower <em>and</em> flakier at once: slower because it always waits the maximum, flakier because a slow environment still blows past the fixed number with no retry.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 05 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">05</span><h2>LoginPage — dissected</h2></div>
+    <div class="col">
+      <span class="filename">src/pages/LoginPage.ts</span>
+      <pre class="code"><code><span class="k">export class</span> LoginPage <span class="k">extends</span> BasePage {
+
+    <span class="k">static readonly</span> PATH = <span class="s">'/playwright/ttacart/index.html'</span>;
+
+    <span class="k">private readonly</span> usernameInput: Locator;
+    <span class="k">private readonly</span> passwordInput: Locator;
+    <span class="k">private readonly</span> loginButton:   Locator;
+    <span class="k">private readonly</span> errorBox:      Locator;
+
+    <span class="k">constructor</span>(page: Page) {
+        <span class="hl">super(page, <span class="s">'LoginPage'</span>);</span>
+        <span class="k">this</span>.usernameInput = page.locator(<span class="s">'[data-test="username"]'</span>);
+        <span class="k">this</span>.passwordInput = page.locator(<span class="s">'[data-test="password"]'</span>);
+        <span class="k">this</span>.loginButton   = page.locator(<span class="s">'[data-test="login-button"]'</span>);
+        <span class="k">this</span>.errorBox      = page.locator(<span class="s">'[data-test="error"]'</span>);
+    }
+
+    <span class="k">async</span> open(): Promise&lt;<span class="k">void</span>&gt; {
+        <span class="k">this</span>.log.info(<span class="s">"Open login pgae"</span>);
+        <span class="k">await this</span>.goto(LoginPage.PATH);
+    }</code></pre>
+
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">extends BasePage</code>
+          <div class="d-body">
+            <p class="d-what">Inherits everything <code>BasePage</code> declares — <code>page</code>, <code>el</code>, <code>log</code>, <code>goto()</code> — without redeclaring any of it.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>BasePage.ts</code>, and to the six sibling page objects that extend the same base.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><code>this.el</code>, <code>this.log</code> and <code>this.goto</code> all become <code>Property does not exist</code> errors, and <code>super()</code> is illegal. You would have to hand-build a logger and an element wrapper in <em>every</em> page class — the duplication POM exists to prevent.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">static</code>
+          <div class="d-body">
+            <p class="d-what">Puts <code>PATH</code> on the <em>class</em>, not on each instance. Read it as <code>LoginPage.PATH</code> without constructing anything.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>this.goto(LoginPage.PATH)</code> inside <code>open()</code>, and any other file that wants to know the login URL.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>It becomes an instance field, so reading it requires an object first. Note the code says <code>LoginPage.PATH</code>, not <code>this.PATH</code> — remove <code>static</code> without changing that reference and it stops compiling.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">private readonly<br>usernameInput</code>
+          <div class="d-body">
+            <p class="d-what">The selector lives here and only here. <code>private</code> hides it from specs; <code>readonly</code> pins it after construction.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>this.el.fill(this.usernameInput, username)</code> in <code>loginAs</code>. Nothing outside this file can name it.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete <code>private</code></span><span>A spec could reach in with <code>loginPage.usernameInput.fill('x')</code>, and the selector's blast radius grows from one file to every file that does so.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">[data-test="…"]</code>
+          <div class="d-body">
+            <p class="d-what">An attribute selector aimed at a dedicated test hook, rather than at a CSS class or DOM position.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Attributes in the TTACart markup that exist purely for automation.</span></p>
+            <p class="d-omit"><span class="d-tag">Use CSS instead</span><span>Target <code>.btn-primary</code> or <code>div &gt; form &gt; input:nth-child(2)</code> and your test breaks the next time someone restyles the page or reorders a field. <code>data-test</code> attributes change only when someone deliberately changes them.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">super(page,<br>'LoginPage')</code>
+          <div class="d-body">
+            <p class="d-what">Calls the parent constructor. <strong>It must be the first statement</strong> — TypeScript forbids touching <code>this</code> before it runs.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>BasePage</code>'s constructor, which uses that second argument as the scope for both the logger and the element wrapper.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><code>'super' must be called before accessing 'this'</code>. Move it below the locator assignments and you get the same error — the order is enforced, not stylistic.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">page.locator(…)<br><span class="muted">in the constructor</span></code>
+          <div class="d-body">
+            <p class="d-what">Builds a locator, which queries <strong>nothing</strong>. A Playwright <code>Locator</code> is a lazy description — "how to find this element <em>when asked</em>". The DOM lookup happens at <code>.fill()</code> or <code>.click()</code> time.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Every <code>this.el.*</code> call that later resolves it against whatever the page currently shows.</span></p>
+            <p class="d-omit"><span class="d-tag">Why it matters</span><span>Because nothing is resolved up front, locators <b>never go stale</b> across navigations, and building five of them in a constructor is free. An older tool like Selenium returns a live element reference here, which <em>does</em> go stale — hence its classic <code>StaleElementReferenceException</code>.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <h3>The URL is assembled, not hardcoded</h3>
+      <div class="terminal">
+<span class="dim">baseURL   </span> https://app.thetestingacademy.com  <span class="dim">← resolveBaseURL(), TTA_ENV=qa</span><br>
+<span class="dim">+ PATH    </span> /playwright/ttacart/index.html<br>
+<span class="dim">──────────</span><br>
+<span class="ok">= https://app.thetestingacademy.com/playwright/ttacart/index.html</span>
+      </div>
+
+      <h3>The most interesting method in the file</h3>
+      <pre class="code"><code><span class="k">async</span> loginAs(username: <span class="k">string</span>, password: <span class="k">string</span>) {
+    <span class="k">this</span>.log.info(<span class="s">`loginAs ${username}`</span>);
+    <span class="k">await this</span>.el.fill(<span class="k">this</span>.usernameInput, username);
+    <span class="k">await this</span>.el.fill(<span class="k">this</span>.passwordInput, password);
+    <span class="k">await this</span>.el.click(<span class="k">this</span>.loginButton);
+
+    <span class="c">// wait until the page settles — either way</span>
+    <span class="k">await</span> expect.poll(<span class="k">async</span> () =&gt; (
+        <span class="hl">this.page.url().includes(<span class="s">'/inventory'</span>) || <span class="k">await this</span>.errorBox.isVisible()</span>
+    )).toBe(<span class="k">true</span>);
+}</code></pre>
+
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">expect.poll</code>
+          <div class="d-body">
+            <p class="d-what">Re-runs the function you give it every ~100ms until it returns the expected value or the budget expires. Unlike plain <code>expect</code>, it re-invokes <em>your own code</em>, not just a locator query.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>expect: { timeout: 10_000 }</code> in <code>playwright.config.ts</code> — this call passes no explicit timeout, so it inherits the config value.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><code>loginAs</code> returns the moment the click dispatches, while the browser is still mid-navigation. The very next line races the page. This is the classic source of "passes locally, fails in CI".</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">||</code>
+          <div class="d-body">
+            <p class="d-what">The design decision of the whole file. It makes <strong>either</strong> outcome — logged in, or rejected with an error — end the wait.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The <code>invalidLogin</code> fixture in <code>src/fixtures/test-base.ts</code>, which logs in as <code>locked_out_user</code> and expects the error banner. It reuses this exact method.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Wait only for <code>/inventory</code> and the negative-login fixture hangs for the full 10s and then fails — even though it behaved exactly as intended. <b>The method would no longer be reusable for failure cases.</b></span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">.toBe(true)</code>
+          <div class="d-body">
+            <p class="d-what">The condition the poll is waiting to see. It converts "keep checking" into a concrete pass/fail.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The boolean the polled arrow function returns.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span><code>expect.poll(...)</code> alone never executes — it builds an assertion object and discards it. The wait silently does nothing, and you would never know.</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 800 246" role="img" aria-label="After the login click, expect.poll retries until either the URL contains slash inventory or the error box becomes visible, and both outcomes satisfy the poll">
+          <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+          <rect x="24" y="94" width="150" height="46" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".6"/>
+          <text x="99" y="122" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" text-anchor="middle">el.click(login)</text>
+          <line x1="174" y1="117" x2="228" y2="117" stroke="currentColor" stroke-width="1.4" opacity=".7" marker-end="url(#ar3)"/>
+          <rect x="228" y="88" width="176" height="58" rx="3" fill="#2F4BD8" fill-opacity=".1" stroke="#2F4BD8" stroke-width="1.4"/>
+          <text x="316" y="112" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="currentColor" text-anchor="middle">expect.poll</text>
+          <text x="316" y="130" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".65" text-anchor="middle">retries ~every 100ms</text>
+          <path d="M 404 104 L 470 104 L 470 52 L 536 52" fill="none" stroke="#16794F" stroke-width="1.5" marker-end="url(#ar3)"/>
+          <path d="M 404 130 L 470 130 L 470 190 L 536 190" fill="none" stroke="#B23A31" stroke-width="1.5" marker-end="url(#ar3)"/>
+          <rect x="536" y="28" width="240" height="50" rx="3" fill="#16794F" fill-opacity=".1" stroke="#16794F" stroke-width="1.3"/>
+          <text x="656" y="49" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" text-anchor="middle">url contains /inventory</text>
+          <text x="656" y="67" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#16794F" text-anchor="middle">logged in</text>
+          <rect x="536" y="166" width="240" height="50" rx="3" fill="#B23A31" fill-opacity=".1" stroke="#B23A31" stroke-width="1.3"/>
+          <text x="656" y="187" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor" text-anchor="middle">errorBox is visible</text>
+          <text x="656" y="205" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#B23A31" text-anchor="middle">rejected</text>
+          <text x="478" y="122" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" opacity=".75">either</text>
+          <text x="478" y="138" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" opacity=".75">satisfies</text>
+          <text x="24" y="238" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".6">Both outcomes end the wait. The test — not the page object — decides which one was correct.</text>
+        </svg>
+      </div>
+      <figcaption><b>Actions in pages, assertions in tests.</b> Because <code>loginAs</code> accepts either landing, one method serves your passing login test <em>and</em> the <code>invalidLogin</code> fixture. Had it asserted success internally, the negative case could not reuse it.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ═══ 06 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">06</span><h2>The spec — dissected</h2></div>
+    <div class="col">
+      <span class="filename">src/tests/login/login.spec.ts</span>
+      <pre class="code"><code><span class="k">const</span> log = createLogger(<span class="s">'login.spec'</span>);
+
+test.describe(<span class="s">'TTACart - Login'</span>, () =&gt; {
+    <span class="k">let</span> loginPage: LoginPage;
+
+    test.beforeEach(<span class="k">async</span> (<span class="hl">{ page }</span>) =&gt; {
+        loginPage = <span class="k">new</span> LoginPage(page);
+        <span class="k">await</span> test.step(<span class="s">'Open the TTACart login page'</span>, <span class="k">async</span> () =&gt; {
+            log.info(<span class="s">'Opening the TTACart login page'</span>);
+            <span class="k">await</span> loginPage.open();
+        });
+    });
+
+    test(<span class="s">'logs in with valid credentials <span class="hl">@p0</span>'</span>, <span class="k">async</span> ({ page }) =&gt; {
+        <span class="k">await</span> test.step(<span class="s">'Login as standard_user'</span>, <span class="k">async</span> () =&gt; {
+            <span class="k">await</span> loginPage.loginAs(<span class="s">'standard_user'</span>, <span class="s">'tta_secret'</span>);
+        });
+
+        <span class="k">await</span> test.step(<span class="s">'Verify login form is no longer shown'</span>, <span class="k">async</span> () =&gt; {
+            <span class="k">await</span> loginPage.waitForLoginButtonHidden();
+        });
+    });
+});</code></pre>
+
+      <div class="dissect">
+        <div class="d-row">
+          <code class="d-token">const log = …<br><span class="muted">at module scope</span></code>
+          <div class="d-body">
+            <p class="d-what">Sits outside every function, so it runs <strong>once when the file is imported</strong> — not per test. Tags this file's own messages <code>[login.spec]</code>, distinct from <code>[LoginPage]</code>.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>createLogger</code> in <code>src/utils/logger.ts</code>, the same factory <code>BasePage</code> uses.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>You lose the ability to see control passing between spec and page in the log stream. Everything would carry the page's tag, hiding which layer initiated what.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">test.describe</code>
+          <div class="d-body">
+            <p class="d-what">Groups related tests under a shared title and creates a scope that <code>beforeEach</code> applies to.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Report headings, and the <code>--grep</code> filter, which matches against the full title including the describe prefix.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>Tests still run, but any <code>beforeEach</code> now applies to the whole <em>file</em>, and the report loses its grouping. With one test the cost is small; with twenty it is not.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">let loginPage</code>
+          <div class="d-body">
+            <p class="d-what"><code>let</code> because the value is <em>reassigned</em> in every <code>beforeEach</code>. It is declared in the describe scope so both the hook and the test body can see the same variable.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>The assignment in <code>beforeEach</code> and the reads in the test body.</span></p>
+            <p class="d-omit"><span class="d-tag">Use <code>const</code></span><span><code>Cannot assign to 'loginPage' because it is a constant</code>. Declare it <em>inside</em> <code>beforeEach</code> instead and the test body cannot see it at all — <code>Cannot find name 'loginPage'</code>.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">{ page }<br><span class="muted">the destructuring</span></code>
+          <div class="d-body">
+            <p class="d-what">Not ordinary destructuring — this is a <strong>fixture request</strong>. Playwright inspects the parameter names you write and creates exactly those fixtures. Naming <code>page</code> is what causes a fresh browser context and tab to be built for this test.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Playwright's built-in fixtures, and to your own in <code>src/fixtures/test-base.ts</code> — which is how the e2e specs ask for <code>{ loginPage }</code> directly and skip the manual <code>new</code>.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>No <code>page</code> is created at all — Playwright builds only what you name. <code>new LoginPage(page)</code> then fails with <code>page is not defined</code>. Conversely, naming a fixture you do not use still pays its setup cost.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">beforeEach<br><span class="muted">not beforeAll</span></code>
+          <div class="d-body">
+            <p class="d-what">Runs before <em>every</em> test, rebuilding the page object each time — necessary because each test gets a different <code>page</code>.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Playwright's per-test isolation: a fresh <code>BrowserContext</code> with empty cookies and localStorage.</span></p>
+            <p class="d-omit"><span class="d-tag">Use <code>beforeAll</code></span><span>The page object would be built once against the <em>first</em> test's page, which is closed before the second test runs. Every subsequent test fails with <code>Target page, context or browser has been closed</code>.</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">async () =&gt;</code>
+          <div class="d-body">
+            <p class="d-what">An arrow function marked async. Arrow syntax matters: it does not rebind <code>this</code>, so surrounding scope stays intact.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span>Every <code>await</code> inside the body.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete <code>async</code></span><span>Every <code>await</code> in the body becomes a syntax error. Worse, if you also drop the <code>await</code>s, the test function returns immediately — Playwright marks it <b>passed</b> while the browser work is still running. <b>A test that always passes and tests nothing.</b></span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">test.step</code>
+          <div class="d-body">
+            <p class="d-what">Purely for reporting — it does not change execution. It creates the collapsible tree in the HTML report and the ✅ lines your <code>CustomReporter</code> prints.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>src/utils/visualStep.ts</code>, which wraps <code>test.step</code> to attach a screenshot per step when <code>ATTACH_SCREENSHOTS=true</code>. Also to the trace viewer's timeline.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>The test still passes identically. You lose the labelled breakdown in the report, so a failure points at a bare line number instead of "Login as standard_user".</span></p>
+          </div>
+        </div>
+        <div class="d-row">
+          <code class="d-token">@p0<br><span class="muted">in the title</span></code>
+          <div class="d-body">
+            <p class="d-what">A tag. It carries no special syntax — it is just text in the title that a filter can match.</p>
+            <p class="d-link"><span class="d-tag">Links to</span><span><code>npm test -- --grep @p0</code>, and to CI configs that run only the critical subset.</span></p>
+            <p class="d-omit"><span class="d-tag">Delete it</span><span>The test drops out of every <code>--grep @p0</code> run — including, silently, any CI job that filters on it. It would stop being executed without anything reporting an error.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="note err">
+        <span class="note-label">The one that bites hardest</span>
+        <p>Of everything on this page, the missing <code>await</code> is the failure you will actually meet. A test with no <code>await</code> finishes before the browser does, so Playwright records a <strong>pass</strong> for work that never completed — or that failed after the verdict was already written.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ D ════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">D</span><h2>Worked example: add a page yourself</h2></div>
+    <div class="col">
+      <p class="lede">
+        The real test of understanding a framework is adding to it. Here is a complete new page object
+        — every file you touch, in order.
+      </p>
+      <p>
+        Say TTACart gains an <strong>Order History</strong> screen listing past orders, and you need a
+        test that checks a completed order shows up.
+      </p>
+
+      <h4>Step 1 — the page object</h4>
+      <span class="filename">src/pages/OrderHistoryPage.ts — new file</span>
+      <pre class="code"><code><span class="k">import</span> { expect, Locator, Page } <span class="k">from</span> <span class="s">'@playwright/test'</span>;
+<span class="k">import</span> { BasePage } <span class="k">from</span> <span class="s">'./BasePage'</span>;
+
+<span class="k">export class</span> OrderHistoryPage <span class="k">extends</span> BasePage {
+
+    <span class="c">// 1. the URL, relative so it follows TTA_ENV</span>
+    <span class="k">static readonly</span> PATH = <span class="s">'/playwright/ttacart/orders.html'</span>;
+
+    <span class="c">// 2. selectors — private, so no spec can reach them</span>
+    <span class="k">private readonly</span> title:    Locator;
+    <span class="k">private readonly</span> rows:     Locator;
+    <span class="k">private readonly</span> orderIds: Locator;
+
+    <span class="k">constructor</span>(page: Page) {
+        <span class="k">super</span>(page, <span class="s">'OrderHistoryPage'</span>);   <span class="c">// ← first, and the log tag</span>
+        <span class="k">this</span>.title    = page.locator(<span class="s">'[data-test="title"]'</span>);
+        <span class="k">this</span>.rows     = page.locator(<span class="s">'[data-test="order-row"]'</span>);
+        <span class="k">this</span>.orderIds = page.locator(<span class="s">'[data-test="order-id"]'</span>);
+    }
+
+    <span class="c">// 3. actions — public, and they use this.el, never this.page</span>
+    <span class="k">async</span> open(): Promise&lt;<span class="k">void</span>&gt; {
+        <span class="k">this</span>.log.info(<span class="s">'Opening order history'</span>);
+        <span class="k">await this</span>.goto(OrderHistoryPage.PATH);
+    }
+
+    <span class="k">async</span> assertLoaded(): Promise&lt;<span class="k">void</span>&gt; {
+        <span class="k">await this</span>.el.waitForVisible(<span class="k">this</span>.title);
+    }
+
+    <span class="k">async</span> rowCount(): Promise&lt;<span class="k">number</span>&gt; {
+        <span class="k">return this</span>.el.count(<span class="k">this</span>.rows);
+    }
+
+    <span class="k">async</span> allOrderIds(): Promise&lt;<span class="k">string</span>[]&gt; {
+        <span class="k">return this</span>.el.getAllTexts(<span class="k">this</span>.orderIds);
+    }
+}</code></pre>
+      <p>
+        Every method here is built from things <code>BasePage</code> handed over. You wrote no logger,
+        no timeout, no navigation helper — <code>waitForVisible</code>, <code>count</code> and
+        <code>getAllTexts</code> already exist on <code>this.el</code>.
+      </p>
+
+      <h4>Step 2 — register the fixture</h4>
+      <span class="filename">src/fixtures/test-base.ts — three edits</span>
+      <pre class="code"><code><span class="c">// a) import it</span>
+<span class="k">import</span> { OrderHistoryPage } <span class="k">from</span> <span class="s">'@pages/OrderHistoryPage'</span>;
+
+<span class="c">// b) add it to the fixture type</span>
+<span class="k">export type</span> TestFixture = {
+    <span class="c">// … the existing seven …</span>
+    <span class="hl">orderHistoryPage: OrderHistoryPage;</span>
+};
+
+<span class="c">// c) provide it</span>
+<span class="k">export const</span> test = base.extend&lt;TestFixture&gt;({
+    <span class="c">// … the existing ones …</span>
+    <span class="hl">orderHistoryPage: <span class="k">async</span> ({ page }, use) =&gt; {
+        <span class="k">await</span> use(<span class="k">new</span> OrderHistoryPage(page));
+    },</span>
+});</code></pre>
+      <div class="note">
+        <span class="note-label">Miss this step and</span>
+        <p>
+          Everything still works — you just write <code>new OrderHistoryPage(page)</code> by hand in
+          each spec, exactly as <code>login.spec.ts</code> does today. The fixture is what lets specs
+          skip that.
+        </p>
+      </div>
+
+      <h4>Step 3 — the test</h4>
+      <span class="filename">src/tests/orders/order-history.spec.ts — new file</span>
+      <pre class="code"><code><span class="k">import</span> { test, expect } <span class="k">from</span> <span class="s">'@fixtures/test-base'</span>;
+<span class="k">import</span> { createLogger } <span class="k">from</span> <span class="s">'@utils/logger'</span>;
+
+<span class="k">const</span> log = createLogger(<span class="s">'order-history.spec'</span>);
+
+test.describe(<span class="s">'@P1 TTACart - Order history'</span>, () =&gt; {
+
+    test(<span class="s">'shows an order after checkout'</span>, <span class="k">async</span> ({
+        <span class="hl">loginWithSelectedItem</span>,      <span class="c">// ← logged in, one item already in the cart</span>
+        cartPage,
+        checkoutStepOnePage,
+        checkoutStepTwoPage,
+        orderHistoryPage,           <span class="c">// ← the fixture you just added</span>
+    }) =&gt; {
+
+        <span class="k">await</span> test.step(<span class="s">'Complete an order'</span>, <span class="k">async</span> () =&gt; {
+            <span class="k">await</span> cartPage.open();
+            <span class="k">await</span> cartPage.checkout();
+            <span class="k">await</span> checkoutStepOnePage.fillCustomerInfo(<span class="s">'Palkit'</span>, <span class="s">'Rathod'</span>, <span class="s">'380001'</span>);
+            <span class="k">await</span> checkoutStepTwoPage.finish();
+        });
+
+        <span class="k">await</span> test.step(<span class="s">'Order appears in history'</span>, <span class="k">async</span> () =&gt; {
+            log.info(<span class="s">'Checking order history'</span>);
+            <span class="k">await</span> orderHistoryPage.open();
+            <span class="k">await</span> orderHistoryPage.assertLoaded();
+            expect(<span class="k">await</span> orderHistoryPage.rowCount()).toBeGreaterThan(<span class="hl">0</span>);
+        });
+    });
+});</code></pre>
+      <p>
+        Read that test back: it never mentions a selector, a URL, a timeout or a login. It says what a
+        human tester would say. The <code>loginWithSelectedItem</code> fixture silently performed a
+        login, an inventory load and an add-to-cart before the first line ran.
+      </p>
+
+      <h4>Step 4 — run it</h4>
+      <pre class="code"><code><span class="c"># just the new file</span>
+npm test -- src/tests/orders/order-history.spec.ts
+
+<span class="c"># with a visible browser, to watch it</span>
+npm run test:headed -- src/tests/orders/order-history.spec.ts
+
+<span class="c"># every interaction logged, with selectors</span>
+LOG_LEVEL=debug npm test -- src/tests/orders
+
+<span class="c"># screenshot after each step, into the TTA report</span>
+ATTACH_SCREENSHOTS=true npm test -- src/tests/orders</code></pre>
+
+      <div class="note">
+        <span class="note-label">The checklist that keeps it consistent</span>
+        <p>
+          Extend <code>BasePage</code> · call <code>super(page, 'ClassName')</code> first ·
+          <code>private readonly</code> locators · <code>static readonly PATH</code>, relative ·
+          public actions built on <code>this.el</code> · register the fixture.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 07 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">07</span><h2>One run, end to end</h2></div>
+    <div class="col"><p class="lede">Every call the four layers make during that single four-second test, in order.</p></div>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 800 556" role="img" aria-label="Sequence diagram showing calls flowing between the spec, LoginPage, UtilElementLocator and the browser across the whole login test">
+          <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+          <rect x="20" y="14" width="130" height="30" rx="3" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-width="1" opacity=".7"/>
+          <text x="85" y="34" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">login.spec</text>
+          <rect x="230" y="14" width="130" height="30" rx="3" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-width="1" opacity=".7"/>
+          <text x="295" y="34" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">LoginPage</text>
+          <rect x="430" y="14" width="150" height="30" rx="3" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-width="1" opacity=".7"/>
+          <text x="505" y="34" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">UtilElementLocator</text>
+          <rect x="650" y="14" width="130" height="30" rx="3" fill="#2F4BD8" fill-opacity=".12" stroke="#2F4BD8" stroke-width="1.2"/>
+          <text x="715" y="34" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">Browser</text>
+
+          <line x1="85"  y1="44" x2="85"  y2="500" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+          <line x1="295" y1="44" x2="295" y2="500" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+          <line x1="505" y1="44" x2="505" y2="500" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+          <line x1="715" y1="44" x2="715" y2="500" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".35"/>
+
+          <text x="20" y="70" font-family="JetBrains Mono, monospace" font-size="10" font-weight="700" fill="currentColor" opacity=".5">BEFORE EACH</text>
+          <line x1="85" y1="82" x2="290" y2="82" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="92" y="77" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">new LoginPage(page)</text>
+          <text x="302" y="77" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity=".5">builds 5 lazy locators</text>
+          <line x1="85" y1="112" x2="290" y2="112" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="92" y="107" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">open()</text>
+          <line x1="295" y1="140" x2="710" y2="140" stroke="#2F4BD8" stroke-width="1.4" marker-end="url(#ar4)"/>
+          <text x="302" y="135" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#2F4BD8">goto(baseURL + PATH) → waitForLoadState('domcontentloaded')</text>
+
+          <line x1="20" y1="164" x2="780" y2="164" stroke="currentColor" stroke-width="1" opacity=".18"/>
+          <text x="20" y="188" font-family="JetBrains Mono, monospace" font-size="10" font-weight="700" fill="currentColor" opacity=".5">STEP · LOGIN AS STANDARD_USER</text>
+          <line x1="85" y1="206" x2="290" y2="206" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="92" y="201" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">loginAs(user, pass)</text>
+          <line x1="295" y1="234" x2="500" y2="234" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="302" y="229" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">el.fill(usernameInput)</text>
+          <line x1="505" y1="258" x2="710" y2="258" stroke="#A2690F" stroke-width="1.3" marker-end="url(#ar4)"/>
+          <text x="512" y="253" font-family="JetBrains Mono, monospace" font-size="10" fill="#A2690F">loc.fill({ timeout: 15000 })</text>
+          <line x1="295" y1="286" x2="500" y2="286" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="302" y="281" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">el.fill(passwordInput)</text>
+          <line x1="505" y1="310" x2="710" y2="310" stroke="#A2690F" stroke-width="1.3" marker-end="url(#ar4)"/>
+          <text x="512" y="305" font-family="JetBrains Mono, monospace" font-size="10" fill="#A2690F">loc.fill({ timeout: 15000 })</text>
+          <line x1="295" y1="338" x2="500" y2="338" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="302" y="333" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">el.click(loginButton)</text>
+          <line x1="505" y1="362" x2="710" y2="362" stroke="#A2690F" stroke-width="1.3" marker-end="url(#ar4)"/>
+          <text x="512" y="357" font-family="JetBrains Mono, monospace" font-size="10" fill="#A2690F">loc.click({ timeout: 15000 })</text>
+          <line x1="295" y1="392" x2="710" y2="392" stroke="#2F4BD8" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#ar4)"/>
+          <text x="302" y="387" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#2F4BD8">expect.poll: url has /inventory or error visible — retry to 10s</text>
+
+          <line x1="20" y1="414" x2="780" y2="414" stroke="currentColor" stroke-width="1" opacity=".18"/>
+          <text x="20" y="438" font-family="JetBrains Mono, monospace" font-size="10" font-weight="700" fill="currentColor" opacity=".5">STEP · VERIFY FORM IS GONE</text>
+          <line x1="85" y1="456" x2="290" y2="456" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="92" y="451" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">waitForLoginButtonHidden()</text>
+          <line x1="295" y1="482" x2="500" y2="482" stroke="currentColor" stroke-width="1.3" opacity=".8" marker-end="url(#ar4)"/>
+          <text x="302" y="477" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">el.waitForHidden()</text>
+          <line x1="505" y1="482" x2="710" y2="482" stroke="#16794F" stroke-width="1.4" marker-end="url(#ar4)"/>
+          <text x="512" y="477" font-family="JetBrains Mono, monospace" font-size="10" fill="#16794F">expect(loc).toBeHidden() ✓</text>
+
+          <line x1="20" y1="506" x2="780" y2="506" stroke="currentColor" stroke-width="1" opacity=".18"/>
+          <text x="20" y="530" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#16794F" font-weight="700">PASSED 4.0s</text>
+          <text x="130" y="530" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity=".6">context closed · trace.zip + video.webm written · CustomReporter builds tta-report/</text>
+        </svg>
+      </div>
+      <figcaption><b>Solid arrows are direct calls; the dashed arrow is the retrying poll.</b> Every browser-bound arrow originates in <code>UtilElementLocator</code>, never in the spec — that single fact is the architecture working.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ═══ 08 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">08</span><h2>What all this buys you</h2></div>
+    <div class="col"><p class="lede">The abstraction pays for itself the first time the app changes. Suppose TTACart renames <code>data-test="username"</code> to <code>data-test="user"</code>.</p></div>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 800 288" role="img" aria-label="Comparison showing a selector change touching every spec file without the Page Object Model, versus touching a single line inside LoginPage with it">
+          <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+          <text x="24" y="22" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#B23A31">WITHOUT POM — selector copied into every spec</text>
+          <rect x="24" y="36" width="130" height="34" rx="3" fill="#B23A31" fill-opacity=".1" stroke="#B23A31" stroke-width="1.2"/>
+          <text x="89" y="57" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">login.spec</text>
+          <rect x="168" y="36" width="130" height="34" rx="3" fill="#B23A31" fill-opacity=".1" stroke="#B23A31" stroke-width="1.2"/>
+          <text x="233" y="57" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">checkout.spec</text>
+          <rect x="312" y="36" width="130" height="34" rx="3" fill="#B23A31" fill-opacity=".1" stroke="#B23A31" stroke-width="1.2"/>
+          <text x="377" y="57" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">fixture.spec</text>
+          <rect x="456" y="36" width="130" height="34" rx="3" fill="#B23A31" fill-opacity=".1" stroke="#B23A31" stroke-width="1.2"/>
+          <text x="521" y="57" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">env.spec</text>
+          <text x="600" y="57" font-family="JetBrains Mono, monospace" font-size="11" fill="#B23A31">4 files to edit</text>
+          <line x1="89"  y1="82" x2="89"  y2="104" stroke="#B23A31" stroke-width="1.3" marker-end="url(#ar5)"/>
+          <line x1="233" y1="82" x2="233" y2="104" stroke="#B23A31" stroke-width="1.3" marker-end="url(#ar5)"/>
+          <line x1="377" y1="82" x2="377" y2="104" stroke="#B23A31" stroke-width="1.3" marker-end="url(#ar5)"/>
+          <line x1="521" y1="82" x2="521" y2="104" stroke="#B23A31" stroke-width="1.3" marker-end="url(#ar5)"/>
+          <text x="24" y="122" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity=".7">[data-test="username"] hardcoded four times over</text>
+          <line x1="24" y1="146" x2="776" y2="146" stroke="currentColor" stroke-width="1" opacity=".2"/>
+          <text x="24" y="180" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#16794F">WITH POM — selector declared once</text>
+          <rect x="24" y="194" width="130" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>
+          <text x="89" y="215" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">login.spec</text>
+          <rect x="168" y="194" width="130" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>
+          <text x="233" y="215" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">checkout.spec</text>
+          <rect x="312" y="194" width="130" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>
+          <text x="377" y="215" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">fixture.spec</text>
+          <rect x="456" y="194" width="130" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".5"/>
+          <text x="521" y="215" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" text-anchor="middle">env.spec</text>
+          <text x="600" y="215" font-family="JetBrains Mono, monospace" font-size="11" fill="#16794F">0 files to edit</text>
+          <path d="M 89 228 L 89 244 L 305 244 L 305 256" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <path d="M 233 228 L 233 244 L 305 244" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <path d="M 377 228 L 377 244 L 305 244" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <path d="M 521 228 L 521 244 L 305 244" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+          <rect x="176" y="256" width="258" height="26" rx="3" fill="#16794F" fill-opacity=".12" stroke="#16794F" stroke-width="1.4"/>
+          <text x="305" y="274" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">LoginPage.ts — one line</text>
+          <text x="452" y="274" font-family="JetBrains Mono, monospace" font-size="11" fill="#16794F">← change here only</text>
+        </svg>
+      </div>
+      <figcaption><b>Blast radius is the real metric.</b> Four specs already use <code>LoginPage</code> in your suite. The selector is declared at <code>LoginPage.ts:26</code> and nowhere else, so an app change costs one edit instead of four — and that gap widens with every spec you add.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ═══ 09 ═══════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">09</span><h2>Seams worth knowing about</h2></div>
+    <div class="col"><p class="lede">Four things true of this code today. None are breakage — they're where the framework is still settling.</p></div>
+
+    <ul class="gotchas col">
+      <li>
+        <span class="g-tag g-trap">Trap</span>
+        <div>
+          <h3>Two timeout sources, not one</h3>
+          <p><code>expect: { timeout: 10_000 }</code> governs the poll inside <code>loginAs</code> — but <strong>not</strong> any <code>this.el.*</code> wait, because those pass an explicit 15s. Tuning means editing both <code>playwright.config.ts</code> and <code>DEFAULT_ACTION_TIMEOUT_MS</code>.</p>
+        </div>
+      </li>
+      <li>
+        <span class="g-tag g-style">Style</span>
+        <div>
+          <h3>This spec doesn't use your fixtures</h3>
+          <p><code>login.spec.ts</code> imports <code>test</code> from <code>@playwright/test</code> and calls <code>new LoginPage(page)</code> by hand, while your e2e specs import from <code>@fixtures/test-base</code> and ask for <code>{ loginPage }</code>. Both work — the README frames this as the deliberate "plain page-object" contrast — but two styles now coexist.</p>
+        </div>
+      </li>
+      <li>
+        <span class="g-tag g-style">Style</span>
+        <div>
+          <h3>Credentials are hardcoded here</h3>
+          <p>The spec passes <code>'standard_user', 'tta_secret'</code> literally, though <code>src/config/credentials.ts</code> exists for exactly this and already defaults to those values. Your e2e specs use <code>credentials.standardUser</code>, so this one file would not follow a <code>.env</code> override.</p>
+        </div>
+      </li>
+      <li>
+        <span class="g-tag g-dead">Dead</span>
+        <div>
+          <h3>Two unused bindings</h3>
+          <p><code>page</code> is destructured in the test body but never referenced — it was needed before the assertion moved into <code>waitForLoginButtonHidden()</code>. And <code>loginCredentialsHint</code> is declared in <code>LoginPage</code> and used nowhere. Both harmless; removing them changes nothing.</p>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══ reference ════════════════════════════════════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-n">·</span><h2>Quick reference</h2></div>
+
+    <div class="col"><h3>Who owns what</h3></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>File</th><th>Owns</th><th>Must never contain</th></tr></thead>
+        <tbody>
+          <tr><td><code>login.spec.ts</code></td><td>Step names, assertions, tags</td><td>Selectors, URLs, timeouts</td></tr>
+          <tr><td><code>LoginPage.ts</code></td><td>Locators, <code>PATH</code>, page actions</td><td>Assertions about pass/fail</td></tr>
+          <tr><td><code>BasePage.ts</code></td><td><code>page</code>, <code>el</code>, <code>log</code>, <code>goto()</code></td><td>Any locator at all</td></tr>
+          <tr><td><code>UtilElementLocator.ts</code></td><td>Timeouts, action logging</td><td>Knowledge of any page</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col"><h3>Keywords ranked by what breaks</h3></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Remove</th><th>Consequence</th><th>Severity</th></tr></thead>
+        <tbody>
+          <tr><td><code>await</code></td><td>Test passes without testing anything</td><td>Silent false pass</td></tr>
+          <tr><td><code>protected</code></td><td>Specs can reach selectors again; POM void</td><td>Design collapse</td></tr>
+          <tr><td><code>export</code></td><td>No page object compiles</td><td>Build fails</td></tr>
+          <tr><td><code>super()</code></td><td><code>this</code> unusable in constructor</td><td>Build fails</td></tr>
+          <tr><td><code>.toBe(true)</code></td><td>Poll never runs; wait is a no-op</td><td>Silent no-op</td></tr>
+          <tr><td><code>||</code> in <code>loginAs</code></td><td>Negative-login fixture hangs then fails</td><td>Breaks reuse</td></tr>
+          <tr><td><code>@p0</code></td><td>Test silently dropped from filtered runs</td><td>Silent skip</td></tr>
+          <tr><td><code>readonly</code></td><td>Fields reassignable mid-test</td><td>Hard-to-trace bugs</td></tr>
+          <tr><td><code>test.step</code></td><td>Report loses labelled breakdown</td><td>Cosmetic</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col"><h3>The three clocks</h3></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Wait</th><th class="num">Budget</th><th>Set in</th></tr></thead>
+        <tbody>
+          <tr><td>Anything via <code>this.el.*</code></td><td class="num">15s</td><td><code>DEFAULT_ACTION_TIMEOUT_MS</code></td></tr>
+          <tr><td><code>expect.poll</code> in <code>loginAs</code></td><td class="num">10s</td><td><code>expect.timeout</code> in config</td></tr>
+          <tr><td>The whole test</td><td class="num">60s</td><td><code>timeout</code> in config</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <h3>Adding a new page, in order</h3>
+      <ol style="padding-left:1.2rem; margin:1rem 0 0;">
+        <li style="margin-bottom:.5rem;">Create <code>src/pages/YourPage.ts</code> extending <code>BasePage</code>.</li>
+        <li style="margin-bottom:.5rem;">Call <code>super(page, 'YourPage')</code> <em>first</em> — that name becomes your log tag.</li>
+        <li style="margin-bottom:.5rem;">Declare <code>private readonly</code> locators and a <code>static readonly PATH</code>.</li>
+        <li style="margin-bottom:.5rem;">Expose public actions that use <code>this.el</code>, never raw <code>this.page</code>.</li>
+        <li>Register a fixture in <code>src/fixtures/test-base.ts</code> so specs never call <code>new</code>.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Advanced Framework Playwright · TTACart suite · drawn from <code>BasePage.ts</code>, <code>LoginPage.ts</code>, <code>UtilElementLocators.ts</code> and <code>src/tests/login/login.spec.ts</code> as they stand on <code>main</code>.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var label = document.getElementById('themeLabel');
+  function systemIsDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function current() {
+    var t = root.getAttribute('data-theme');
+    if (t === 'dark' || t === 'light') return t;
+    return systemIsDark() ? 'dark' : 'light';
+  }
+  function paint() { label.textContent = current() === 'dark' ? 'Dark' : 'Light'; }
+  try {
+    var saved = localStorage.getItem('anatomy-theme');
+    if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+  } catch (e) {}
+  paint();
+  btn.addEventListener('click', function () {
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('anatomy-theme', next); } catch (e) {}
+    paint();
+  });
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paint);
+  }
+})();
+</script>
+
+</body>
+</html>
