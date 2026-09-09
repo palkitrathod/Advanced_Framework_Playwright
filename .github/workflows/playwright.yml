@@ -19,11 +19,33 @@ jobs:
       run: npm run typecheck
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
+    # Two invocations, because baseURL can only point at one host per run:
+    # the UI specs need the storefront, and 01_basic_ping.spec.ts requests a
+    # relative /ping that must resolve against the API host.
+    - name: Run UI tests
+      run: npx playwright test src/tests/login src/tests/e2e
+      env:
+        BASE_URL: https://app.thetestingacademy.com
+        STANDARD_USER: standard_user
+        TTA_SECRET: tta_secret
+        CHECKOUT_ITEM_ID: test-allthethings-tshirt-red
+    # !cancelled() so a UI failure does not hide the API result.
+    - name: Run API tests
+      if: ${{ !cancelled() }}
+      run: npx playwright test src/tests/apisTests
+      env:
+        BASE_URL: https://restful-booker.herokuapp.com
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
         name: playwright-report
         path: playwright-report/
+        retention-days: 30
+    # CustomReporter writes tta-report/, which the built-in upload above misses.
+    # Both invocations append a timestamped report here, so this holds UI + API.
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: tta-report
+        path: tta-report/
         retention-days: 30
